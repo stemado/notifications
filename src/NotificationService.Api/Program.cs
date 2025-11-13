@@ -12,14 +12,18 @@ builder.Services.AddSwaggerGen();
 // Add notification services
 builder.Services.AddNotifications(builder.Configuration);
 
+// Add JWT authentication (Phase 3)
+builder.Services.AddJwtAuthentication(builder.Configuration);
+
 // Add CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins("http://localhost:3000", "https://localhost:3000") // Update with your frontend URL
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials(); // Required for SignalR
     });
 });
 

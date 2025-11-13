@@ -9,6 +9,8 @@ using NotificationService.Infrastructure.Repositories;
 using NotificationService.Infrastructure.Services;
 using NotificationService.Infrastructure.Services.Channels;
 using NotificationService.Infrastructure.Services.Email;
+using NotificationService.Infrastructure.Services.Teams;
+using NotificationService.Infrastructure.Services.Sms;
 
 namespace NotificationService.Api.Extensions;
 
@@ -47,6 +49,15 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmailService, SmtpEmailService>();
         services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 
+        // Teams services (Phase 3)
+        services.AddHttpClient("Teams");
+        services.AddScoped<ITeamsService, TeamsMessageService>();
+        services.AddScoped<ITeamsCardService, TeamsCardService>();
+
+        // SMS services (Phase 3)
+        services.AddHttpClient("Twilio");
+        services.AddScoped<ISmsService, TwilioSmsService>();
+
         // Event handlers (Phase 1)
         services.AddScoped<IEventHandler<SagaStuckEvent>, SagaStuckNotificationHandler>();
 
@@ -71,11 +82,11 @@ public static class ServiceCollectionExtensions
         // Multi-channel dispatcher (Phase 2 - ACTIVE)
         services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 
-        // Notification channels (Phase 2)
+        // Notification channels (Phase 2+3)
         services.AddScoped<INotificationChannel, SignalRChannel>();
         services.AddScoped<INotificationChannel, EmailChannel>();
-        // Phase 3: Uncomment when implementing
-        // services.AddScoped<INotificationChannel, SlackChannel>();
+        services.AddScoped<INotificationChannel, TeamsChannel>();
+        services.AddScoped<INotificationChannel, SmsChannel>();
 
         return services;
     }

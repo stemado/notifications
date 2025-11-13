@@ -125,11 +125,11 @@ public class UserPreferenceService : IUserPreferenceService
                 MinSeverity = NotificationSeverity.Critical,
                 Enabled = false // Disabled by default (cost)
             },
-            // Slack enabled for Urgent and above
+            // Teams enabled for Urgent and above
             new UserNotificationPreference
             {
                 UserId = userId,
-                Channel = NotificationChannel.Slack,
+                Channel = NotificationChannel.Teams,
                 MinSeverity = NotificationSeverity.Urgent,
                 Enabled = false // Disabled by default
             }
@@ -161,10 +161,10 @@ public class UserPreferenceService : IUserPreferenceService
                 MinSeverity = NotificationSeverity.Critical,
                 Enabled = false
             },
-            NotificationChannel.Slack => new UserNotificationPreference
+            NotificationChannel.Teams => new UserNotificationPreference
             {
                 UserId = userId,
-                Channel = NotificationChannel.Slack,
+                Channel = NotificationChannel.Teams,
                 MinSeverity = NotificationSeverity.Urgent,
                 Enabled = false
             },
