@@ -1,8 +1,14 @@
-using Hangfire;
 using NotificationService.Api.Extensions;
 using NotificationService.Api.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Kestrel to use port 5100
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenLocalhost(5100);
+});
+
 
 // Add services to the container
 builder.Services.AddControllers();
@@ -10,7 +16,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Add notification services
-builder.Services.AddNotifications(builder.Configuration);
+builder.Services.AddNotifications(builder.Configuration, builder.Environment);
 
 // Add JWT authentication (Phase 3)
 builder.Services.AddJwtAuthentication(builder.Configuration);
@@ -47,15 +53,5 @@ app.MapControllers();
 
 // Map SignalR hub
 app.MapHub<NotificationHub>("/hubs/notifications");
-
-// Configure Hangfire dashboard
-app.UseHangfireDashboard("/hangfire", new DashboardOptions
-{
-    // Phase 2: Add authentication for production
-    // Authorization = new[] { new HangfireAuthorizationFilter() }
-});
-
-// Configure notification jobs
-app.UseNotificationJobs();
 
 app.Run();

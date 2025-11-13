@@ -1,4 +1,4 @@
-using Hangfire;
+using Quartz;
 using Microsoft.AspNetCore.SignalR;
 using NotificationService.Api.Hubs;
 using NotificationService.Infrastructure.Services;
@@ -9,7 +9,7 @@ namespace NotificationService.Api.Jobs;
 /// Background job that repeats notifications based on RepeatInterval
 /// Runs every 5 minutes to check for notifications due for repeat
 /// </summary>
-public class NotificationRepeatJob
+public class NotificationRepeatJob : IJob
 {
     private readonly INotificationService _notificationService;
     private readonly IHubContext<NotificationHub> _hubContext;
@@ -25,8 +25,7 @@ public class NotificationRepeatJob
         _logger = logger;
     }
 
-    [AutomaticRetry(Attempts = 3)]
-    public async Task Execute()
+    public async Task Execute(IJobExecutionContext context)
     {
         try
         {

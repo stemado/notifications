@@ -134,6 +134,11 @@ Update `src/NotificationService.Api/appsettings.json`:
 }
 ```
 
+Notes:
+- The application will prefer `appsettings.json`/`appsettings.Development.json` connection strings (ConnectionStrings:NotificationDb).
+- For local development, the code will automatically append `Ssl Mode=Disable` to the connection string if it is not present to avoid SSL negotiation issues with a local PostgreSQL instance. If you need SSL, add `Ssl Mode=Require` and `Trust Server Certificate=true` as appropriate.
+- You can also configure the connection string using the `IMPORT_PULSE_CONNECTION_STRING` environment variable; the app will fall back to that if a connection string is not present in configuration.
+
 ### 3. Run the Service
 
 ```bash

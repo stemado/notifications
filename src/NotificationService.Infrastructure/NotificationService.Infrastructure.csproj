@@ -18,4 +18,12 @@
     <ProjectReference Include="..\NotificationService.Domain\NotificationService.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Added to support SignalR IHubContext<> types used by SignalRChannel -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
+
+    <!-- Added to support IHttpClientFactory used in Teams and Twilio services -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+  </ItemGroup>
+
 </Project>

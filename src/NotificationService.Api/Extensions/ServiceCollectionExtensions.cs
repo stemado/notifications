@@ -1,6 +1,6 @@
-using Hangfire;
-using Hangfire.PostgreSql;
+using Quartz;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using NotificationService.Api.EventHandlers;
 using NotificationService.Api.Events;
 using NotificationService.Api.Jobs;
@@ -22,10 +22,30 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Adds all notification-related services to the DI container
     /// </summary>
-    public static IServiceCollection AddNotifications(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddNotifications(this IServiceCollection services, IConfiguration configuration, IHostEnvironment env)
     {
         // Database
-        var connectionString = configuration.GetConnectionString("NotificationDb");
+        // Prefer the configured connection string in appsettings.json, but fall back to legacy environment variable if present
+        var connectionString = configuration.GetConnectionString("NotificationDb")
+            ?? Environment.GetEnvironmentVariable("IMPORT_PULSE_CONNECTION_STRING", EnvironmentVariableTarget.Machine)
+            ?? throw new InvalidOperationException("Notification database connection string is not configured. Set 'ConnectionStrings:NotificationDb' in configuration or the IMPORT_PULSE_CONNECTION_STRING environment variable.");
+
+        // In local development, most times Postgres is configured without SSL. Ensure we don't force SSL in dev.
+        if (env.IsDevelopment())
+        {
+            // If the connection string does not specify Ssl Mode (or SslMode), append Ssl Mode=Disable
+            // Use a case-insensitive check for the key in the connection string
+            if (!connectionString.Contains("Ssl Mode=", StringComparison.OrdinalIgnoreCase)
+                && !connectionString.Contains("SslMode=", StringComparison.OrdinalIgnoreCase)
+                && !connectionString.Contains("SSLMODE=", StringComparison.OrdinalIgnoreCase))
+            {
+                // Ensure trailing semicolon for append
+                if (!connectionString.EndsWith(";"))
+                    connectionString += ";";
+                connectionString += "Ssl Mode=Disable";
+            }
+        }
+
         services.AddDbContext<NotificationDbContext>(options =>
             options.UseNpgsql(connectionString));
 
@@ -69,15 +89,38 @@ public static class ServiceCollectionExtensions
         // SignalR (Phase 1)
         services.AddSignalR();
 
-        // Hangfire for background jobs (Phase 1)
-        services.AddHangfire(config => config
-            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-            .UseSimpleAssemblyNameTypeSerializer()
-            .UseRecommendedSerializerSettings()
-            .UsePostgreSqlStorage(options =>
-                options.UseNpgsqlConnection(connectionString)));
+        // Quartz.NET for background jobs (Phase 1)
+        services.AddQuartz(q =>
+        {
+            // Notification repeat job - runs every 5 minutes
+            var repeatJobKey = new JobKey("notification-repeat");
+            q.AddJob<NotificationRepeatJob>(opts => opts.WithIdentity(repeatJobKey));
+            q.AddTrigger(opts => opts
+                .ForJob(repeatJobKey)
+                .WithIdentity("notification-repeat-trigger")
+                .WithCronSchedule("0 */5 * * * ?") // Every 5 minutes
+                .WithDescription("Repeats notifications based on RepeatInterval"));
 
-        services.AddHangfireServer();
+            // Notification cleanup job - runs daily at 2 AM
+            var cleanupJobKey = new JobKey("notification-cleanup");
+            q.AddJob<NotificationCleanupJob>(opts => opts.WithIdentity(cleanupJobKey));
+            q.AddTrigger(opts => opts
+                .ForJob(cleanupJobKey)
+                .WithIdentity("notification-cleanup-trigger")
+                .WithCronSchedule("0 0 2 * * ?") // Daily at 2 AM
+                .WithDescription("Cleans up old and acknowledged notifications"));
+
+            // Notification backup polling job - runs every 15 minutes
+            var backupJobKey = new JobKey("notification-backup-polling");
+            q.AddJob<NotificationBackupPollingJob>(opts => opts.WithIdentity(backupJobKey));
+            q.AddTrigger(opts => opts
+                .ForJob(backupJobKey)
+                .WithIdentity("notification-backup-polling-trigger")
+                .WithCronSchedule("0 */15 * * * ?") // Every 15 minutes
+                .WithDescription("Backup polling for stuck sagas"));
+        });
+
+        services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
         // Multi-channel dispatcher (Phase 2 - ACTIVE)
         services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
@@ -89,34 +132,5 @@ public static class ServiceCollectionExtensions
         services.AddScoped<INotificationChannel, SmsChannel>();
 
         return services;
-    }
-
-    /// <summary>
-    /// Configures Hangfire recurring jobs for notifications
-    /// </summary>
-    public static IApplicationBuilder UseNotificationJobs(this IApplicationBuilder app)
-    {
-        // Notification repeat job - runs every 5 minutes
-        RecurringJob.AddOrUpdate<NotificationRepeatJob>(
-            "notification-repeat",
-            job => job.Execute(),
-            "*/5 * * * *" // Every 5 minutes
-        );
-
-        // Notification cleanup job - runs daily at 2 AM
-        RecurringJob.AddOrUpdate<NotificationCleanupJob>(
-            "notification-cleanup",
-            job => job.Execute(),
-            "0 2 * * *" // Daily at 2 AM
-        );
-
-        // Notification backup polling job - runs every 15 minutes
-        RecurringJob.AddOrUpdate<NotificationBackupPollingJob>(
-            "notification-backup-polling",
-            job => job.Execute(),
-            "*/15 * * * *" // Every 15 minutes
-        );
-
-        return app;
     }
 }

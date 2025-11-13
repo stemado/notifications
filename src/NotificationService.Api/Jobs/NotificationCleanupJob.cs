@@ -1,4 +1,4 @@
-using Hangfire;
+using Quartz;
 using NotificationService.Infrastructure.Services;
 
 namespace NotificationService.Api.Jobs;
@@ -7,7 +7,7 @@ namespace NotificationService.Api.Jobs;
 /// Background job that cleans up old notifications
 /// Runs daily at 2 AM to expire old notifications and delete acknowledged ones
 /// </summary>
-public class NotificationCleanupJob
+public class NotificationCleanupJob : IJob
 {
     private readonly INotificationService _notificationService;
     private readonly ILogger<NotificationCleanupJob> _logger;
@@ -20,8 +20,7 @@ public class NotificationCleanupJob
         _logger = logger;
     }
 
-    [AutomaticRetry(Attempts = 3)]
-    public async Task Execute()
+    public async Task Execute(IJobExecutionContext context)
     {
         try
         {

@@ -1,4 +1,4 @@
-using Hangfire;
+using Quartz;
 using NotificationService.Infrastructure.Services;
 
 namespace NotificationService.Api.Jobs;
@@ -8,7 +8,7 @@ namespace NotificationService.Api.Jobs;
 /// This is a safety net in case event handlers fail
 /// Runs every 15 minutes
 /// </summary>
-public class NotificationBackupPollingJob
+public class NotificationBackupPollingJob : IJob
 {
     // Note: ISagaRepository would be defined in your saga domain
     // This is a placeholder interface for the example
@@ -23,8 +23,7 @@ public class NotificationBackupPollingJob
         _notificationService = notificationService;
     }
 
-    [AutomaticRetry(Attempts = 3)]
-    public async Task Execute()
+    public Task Execute(IJobExecutionContext context)
     {
         try
         {
@@ -58,6 +57,7 @@ public class NotificationBackupPollingJob
             // }
 
             _logger.LogInformation("Notification backup polling job completed successfully");
+            return Task.CompletedTask;
         }
         catch (Exception ex)
         {
