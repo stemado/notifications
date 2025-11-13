@@ -148,14 +148,14 @@ dotnet run
 ```
 
 The API will be available at:
-- HTTPS: https://localhost:5001
-- HTTP: http://localhost:5000
-- SignalR Hub: https://localhost:5001/hubs/notifications
-- Hangfire Dashboard: https://localhost:5001/hangfire
+- HTTPS: https://localhost:5201
+- HTTP: http://localhost:5200
+- SignalR Hub: https://localhost:5201/hubs/notifications
+- Hangfire Dashboard: https://localhost:5201/hangfire
 
 ### API Documentation
 
-Swagger UI available at: https://localhost:5001/swagger
+Swagger UI available at: https://localhost:5201/swagger
 
 ## Key Features
 

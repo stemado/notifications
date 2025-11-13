@@ -230,7 +230,7 @@ public async Task<string?> GetUserEmailAsync(Guid userId)
 
 ```bash
 # Enable email notifications for urgent+ severity
-curl -X PUT https://localhost:5001/api/preferences/Email \
+curl -X PUT https://localhost:5201/api/preferences/Email \
   -H "Content-Type: application/json" \
   -d '{
     "minSeverity": "Urgent",
@@ -242,7 +242,7 @@ curl -X PUT https://localhost:5001/api/preferences/Email \
 
 ```bash
 # Subscribe to all notifications for a specific client
-curl -X POST https://localhost:5001/api/subscriptions \
+curl -X POST https://localhost:5201/api/subscriptions \
   -H "Content-Type: application/json" \
   -d '{
     "clientId": "12345678-1234-1234-1234-123456789012",
@@ -255,7 +255,7 @@ curl -X POST https://localhost:5001/api/subscriptions \
 
 ```bash
 # Subscribe to critical notifications for a specific saga
-curl -X POST https://localhost:5001/api/subscriptions \
+curl -X POST https://localhost:5201/api/subscriptions \
   -H "Content-Type: application/json" \
   -d '{
     "clientId": "12345678-1234-1234-1234-123456789012",

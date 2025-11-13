@@ -148,10 +148,10 @@ dotnet run
 ```
 
 The service will be available at:
-- **API**: https://localhost:5001
-- **Swagger**: https://localhost:5001/swagger
-- **SignalR Hub**: https://localhost:5001/hubs/notifications
-- **Hangfire Dashboard**: https://localhost:5001/hangfire
+- **API**: https://localhost:5201
+- **Swagger**: https://localhost:5201/swagger
+- **SignalR Hub**: https://localhost:5201/hubs/notifications
+- **Hangfire Dashboard**: https://localhost:5201/hangfire
 
 ## API Endpoints
 
@@ -193,7 +193,7 @@ DELETE /api/subscriptions                     # Delete subscription
 ### Create a Notification
 
 ```bash
-curl -X POST https://localhost:5001/api/notifications \
+curl -X POST https://localhost:5201/api/notifications \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -216,7 +216,7 @@ curl -X POST https://localhost:5001/api/notifications \
 ### Configure Email Preferences
 
 ```bash
-curl -X PUT https://localhost:5001/api/preferences/Email \
+  curl -X PUT https://localhost:5201/api/preferences/Email \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -228,7 +228,7 @@ curl -X PUT https://localhost:5001/api/preferences/Email \
 ### Subscribe to Client Notifications
 
 ```bash
-curl -X POST https://localhost:5001/api/subscriptions \
+curl -X POST https://localhost:5201/api/subscriptions \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -299,7 +299,7 @@ The service includes 3 Hangfire background jobs:
 | **NotificationCleanupJob** | Daily at 2 AM | Expires old and deletes acknowledged notifications |
 | **NotificationBackupPollingJob** | Every 15 minutes | Safety net for missed event-driven notifications |
 
-Monitor jobs at: https://localhost:5001/hangfire
+Monitor jobs at: https://localhost:5201/hangfire
 
 ## Testing
 

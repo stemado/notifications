@@ -19,7 +19,7 @@ This guide provides complete API contracts, TypeScript types, React hooks, and i
 
 ## API Overview
 
-**Base URL**: `https://localhost:5001` (or your deployed URL)
+**Base URL**: `https://localhost:5201` (or your deployed URL)
 
 **Authentication**: JWT Bearer token in `Authorization` header
 
@@ -817,7 +817,7 @@ class NotificationApi {
 
   constructor() {
     this.client = axios.create({
-      baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://localhost:5001',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://localhost:5201',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -896,7 +896,7 @@ class PreferencesApi {
 
   constructor() {
     this.client = axios.create({
-      baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://localhost:5001',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://localhost:5201',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -952,8 +952,8 @@ export const preferencesApi = new PreferencesApi();
 ```env
 # .env.local
 
-NEXT_PUBLIC_API_URL=https://localhost:5001
-NEXT_PUBLIC_SIGNALR_HUB_URL=https://localhost:5001
+NEXT_PUBLIC_API_URL=https://localhost:5201
+NEXT_PUBLIC_SIGNALR_HUB_URL=https://localhost:5201
 ```
 
 ---

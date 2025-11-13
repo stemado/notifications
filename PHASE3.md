@@ -95,7 +95,7 @@ This document describes the Phase 3 implementation of the notification service.
 ```bash
 # Include JWT token in Authorization header
 curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-     https://localhost:5001/api/notifications/active
+  https://localhost:5201/api/notifications/active
 ```
 
 ### ✅ Domain Model Updates
@@ -187,7 +187,7 @@ openssl rand -base64 32
 
 ```bash
 # Enable Teams notifications for urgent+ severity
-curl -X PUT https://localhost:5001/api/preferences/Teams \
+curl -X PUT https://localhost:5201/api/preferences/Teams \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -200,7 +200,7 @@ curl -X PUT https://localhost:5001/api/preferences/Teams \
 
 ```bash
 # Enable SMS for critical only
-curl -X PUT https://localhost:5001/api/preferences/SMS \
+curl -X PUT https://localhost:5201/api/preferences/SMS \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -230,15 +230,15 @@ curl -X PUT https://localhost:5001/api/preferences/SMS \
 ### Test JWT Authentication
 
 1. **Without token** (should fail):
-   ```bash
-   curl https://localhost:5001/api/notifications/active
+  ```bash
+  curl https://localhost:5201/api/notifications/active
    # Returns: 401 Unauthorized
    ```
 
 2. **With token** (should succeed):
    ```bash
    curl -H "Authorization: Bearer YOUR_TOKEN" \
-        https://localhost:5001/api/notifications/active
+     https://localhost:5201/api/notifications/active
    # Returns: 200 OK with notifications
    ```
 

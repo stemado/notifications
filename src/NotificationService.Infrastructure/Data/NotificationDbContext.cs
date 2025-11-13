@@ -28,23 +28,31 @@ public class NotificationDbContext : DbContext
         // Configure Notification entity
         modelBuilder.Entity<Notification>(entity =>
         {
-            entity.ToTable("Notifications");
+            entity.ToTable("notifications");
             entity.HasKey(e => e.Id);
-
-            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
-            entity.Property(e => e.UserId).IsRequired();
-            entity.Property(e => e.Severity).IsRequired().HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
-            entity.Property(e => e.Message).IsRequired();
-            entity.Property(e => e.EventType).HasMaxLength(100);
-            entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("NOW()");
-            entity.Property(e => e.GroupKey).HasMaxLength(200);
-            entity.Property(e => e.GroupCount).HasDefaultValue(1);
-            entity.Property(e => e.RequiresAck).HasDefaultValue(false);
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()").HasColumnName("id");
+            entity.Property(e => e.UserId).IsRequired().HasColumnName("user_id");
+            entity.Property(e => e.TenantId).HasColumnName("tenant_id");
+            entity.Property(e => e.Severity).IsRequired().HasConversion<string>().HasMaxLength(20).HasColumnName("severity");
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(200).HasColumnName("title");
+            entity.Property(e => e.Message).IsRequired().HasColumnName("message");
+            entity.Property(e => e.SagaId).HasColumnName("saga_id");
+            entity.Property(e => e.ClientId).HasColumnName("client_id");
+            entity.Property(e => e.EventId).HasColumnName("event_id");
+            entity.Property(e => e.EventType).HasMaxLength(100).HasColumnName("event_type");
+            entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("NOW()").HasColumnName("created_at");
+            entity.Property(e => e.AcknowledgedAt).HasColumnName("acknowledged_at");
+            entity.Property(e => e.DismissedAt).HasColumnName("dismissed_at");
+            entity.Property(e => e.ExpiresAt).HasColumnName("expires_at");
+            entity.Property(e => e.RepeatInterval).HasColumnName("repeat_interval");
+            entity.Property(e => e.LastRepeatedAt).HasColumnName("last_repeated_at");
+            entity.Property(e => e.RequiresAck).HasDefaultValue(false).HasColumnName("requires_ack");
+            entity.Property(e => e.GroupKey).HasMaxLength(200).HasColumnName("group_key");
+            entity.Property(e => e.GroupCount).HasDefaultValue(1).HasColumnName("group_count");
 
             // Configure JSON columns
             entity.Property(e => e.Actions)
-                .HasColumnName("ActionsJson")
+                .HasColumnName("actions_json")
                 .HasColumnType("jsonb")
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
@@ -52,7 +60,7 @@ public class NotificationDbContext : DbContext
                 );
 
             entity.Property(e => e.Metadata)
-                .HasColumnName("MetadataJson")
+                .HasColumnName("metadata_json")
                 .HasColumnType("jsonb")
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
@@ -62,7 +70,7 @@ public class NotificationDbContext : DbContext
             // Configure indexes
             entity.HasIndex(e => new { e.UserId, e.AcknowledgedAt })
                 .HasDatabaseName("idx_notifications_user_unread")
-                .HasFilter("\"AcknowledgedAt\" IS NULL");
+                .HasFilter("acknowledged_at IS NULL");
 
             entity.HasIndex(e => new { e.TenantId, e.CreatedAt })
                 .HasDatabaseName("idx_notifications_tenant")
@@ -70,7 +78,7 @@ public class NotificationDbContext : DbContext
 
             entity.HasIndex(e => e.GroupKey)
                 .HasDatabaseName("idx_notifications_group_key")
-                .HasFilter("\"AcknowledgedAt\" IS NULL");
+                .HasFilter("acknowledged_at IS NULL");
 
             entity.HasIndex(e => new { e.SagaId, e.CreatedAt })
                 .HasDatabaseName("idx_notifications_saga")
@@ -80,13 +88,16 @@ public class NotificationDbContext : DbContext
         // Configure NotificationDelivery entity
         modelBuilder.Entity<NotificationDelivery>(entity =>
         {
-            entity.ToTable("NotificationDeliveries");
+            entity.ToTable("notification_deliveries");
             entity.HasKey(e => e.Id);
 
-            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
-            entity.Property(e => e.NotificationId).IsRequired();
-            entity.Property(e => e.Channel).IsRequired().HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.AttemptCount).HasDefaultValue(0);
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()").HasColumnName("id");
+            entity.Property(e => e.NotificationId).IsRequired().HasColumnName("notification_id");
+            entity.Property(e => e.Channel).IsRequired().HasConversion<string>().HasMaxLength(20).HasColumnName("channel");
+            entity.Property(e => e.DeliveredAt).HasColumnName("delivered_at");
+            entity.Property(e => e.FailedAt).HasColumnName("failed_at");
+            entity.Property(e => e.ErrorMessage).HasColumnName("error_message");
+            entity.Property(e => e.AttemptCount).HasDefaultValue(0).HasColumnName("attempt_count");
 
             // Configure relationship
             entity.HasOne(e => e.Notification)
@@ -102,23 +113,27 @@ public class NotificationDbContext : DbContext
         // Configure UserNotificationPreference entity (Phase 2)
         modelBuilder.Entity<UserNotificationPreference>(entity =>
         {
-            entity.ToTable("UserNotificationPreferences");
+            entity.ToTable("user_notification_preferences");
             entity.HasKey(e => new { e.UserId, e.Channel });
 
             entity.Property(e => e.UserId).IsRequired();
-            entity.Property(e => e.Channel).IsRequired().HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.MinSeverity).IsRequired().HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.Enabled).HasDefaultValue(true);
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Channel).IsRequired().HasConversion<string>().HasMaxLength(20).HasColumnName("channel");
+            entity.Property(e => e.MinSeverity).IsRequired().HasConversion<string>().HasMaxLength(20).HasColumnName("min_severity");
+            entity.Property(e => e.Enabled).HasDefaultValue(true).HasColumnName("enabled");
         });
 
         // Configure NotificationSubscription entity (Phase 2)
         modelBuilder.Entity<NotificationSubscription>(entity =>
         {
-            entity.ToTable("NotificationSubscriptions");
+            entity.ToTable("notification_subscriptions");
             entity.HasKey(e => new { e.UserId, e.ClientId, e.SagaId });
 
             entity.Property(e => e.UserId).IsRequired();
-            entity.Property(e => e.MinSeverity).IsRequired().HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.ClientId).HasColumnName("client_id");
+            entity.Property(e => e.SagaId).HasColumnName("saga_id");
+            entity.Property(e => e.MinSeverity).IsRequired().HasConversion<string>().HasMaxLength(20).HasColumnName("min_severity");
         });
     }
 }
