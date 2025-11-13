@@ -1,6 +1,4 @@
-using Microsoft.AspNetCore.SignalR;
 using NotificationService.Api.Events;
-using NotificationService.Api.Hubs;
 using NotificationService.Domain.DTOs;
 using NotificationService.Domain.Enums;
 using NotificationService.Domain.Models;
@@ -9,23 +7,23 @@ using NotificationService.Infrastructure.Services;
 namespace NotificationService.Api.EventHandlers;
 
 /// <summary>
-/// Handles SagaStuckEvent by creating notifications and pushing them via SignalR
+/// Handles SagaStuckEvent by creating notifications and dispatching them via multi-channel dispatcher (Phase 2)
 /// </summary>
 public class SagaStuckNotificationHandler : IEventHandler<SagaStuckEvent>
 {
     private readonly INotificationService _notificationService;
-    private readonly IHubContext<NotificationHub> _hubContext;
+    private readonly INotificationDispatcher _dispatcher;
     private readonly ILogger<SagaStuckNotificationHandler> _logger;
     private readonly IConfiguration _configuration;
 
     public SagaStuckNotificationHandler(
         INotificationService notificationService,
-        IHubContext<NotificationHub> hubContext,
+        INotificationDispatcher dispatcher,
         ILogger<SagaStuckNotificationHandler> logger,
         IConfiguration configuration)
     {
         _notificationService = notificationService;
-        _hubContext = hubContext;
+        _dispatcher = dispatcher;
         _logger = logger;
         _configuration = configuration;
     }
@@ -70,15 +68,12 @@ public class SagaStuckNotificationHandler : IEventHandler<SagaStuckEvent>
                 }
             });
 
-            // Push via SignalR (Phase 1)
-            await _hubContext.Clients.Group("ops-team").SendAsync("NewNotification", notification);
+            // Dispatch via multi-channel dispatcher (Phase 2)
+            await _dispatcher.DispatchAsync(notification);
 
             _logger.LogInformation(
-                "Created notification {NotificationId} for stuck saga {SagaId} with severity {Severity}",
+                "Created and dispatched notification {NotificationId} for stuck saga {SagaId} with severity {Severity}",
                 notification.Id, evt.SagaId, severity);
-
-            // Future: Multi-channel dispatch (Phase 2)
-            // await _notificationDispatcher.DispatchAsync(notification);
         }
         catch (Exception ex)
         {

@@ -8,6 +8,7 @@ using NotificationService.Infrastructure.Data;
 using NotificationService.Infrastructure.Repositories;
 using NotificationService.Infrastructure.Services;
 using NotificationService.Infrastructure.Services.Channels;
+using NotificationService.Infrastructure.Services.Email;
 
 namespace NotificationService.Api.Extensions;
 
@@ -29,8 +30,22 @@ public static class ServiceCollectionExtensions
         // Repositories (Phase 1)
         services.AddScoped<INotificationRepository, NotificationRepository>();
 
+        // Repositories (Phase 2)
+        services.AddScoped<INotificationDeliveryRepository, NotificationDeliveryRepository>();
+        services.AddScoped<IUserPreferenceRepository, UserPreferenceRepository>();
+        services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+
         // Core services (Phase 1)
         services.AddScoped<INotificationService, Infrastructure.Services.NotificationService>();
+
+        // Services (Phase 2)
+        services.AddScoped<IUserPreferenceService, UserPreferenceService>();
+        services.AddScoped<ISubscriptionService, SubscriptionService>();
+        services.AddScoped<IUserService, UserService>();
+
+        // Email services (Phase 2)
+        services.AddScoped<IEmailService, SmtpEmailService>();
+        services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 
         // Event handlers (Phase 1)
         services.AddScoped<IEventHandler<SagaStuckEvent>, SagaStuckNotificationHandler>();
@@ -53,11 +68,12 @@ public static class ServiceCollectionExtensions
 
         services.AddHangfireServer();
 
-        // Multi-channel (Phase 2 - register but don't use yet)
+        // Multi-channel dispatcher (Phase 2 - ACTIVE)
         services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
+
+        // Notification channels (Phase 2)
         services.AddScoped<INotificationChannel, SignalRChannel>();
-        // Phase 2: Uncomment when implementing
-        // services.AddScoped<INotificationChannel, EmailChannel>();
+        services.AddScoped<INotificationChannel, EmailChannel>();
         // Phase 3: Uncomment when implementing
         // services.AddScoped<INotificationChannel, SlackChannel>();
 
