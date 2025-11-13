@@ -3,14 +3,6 @@ using NotificationService.Api.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Kestrel to use port 5200
-// NOTE: Changed from 5100 to 5200 to avoid conflicts with existing services (e.g., 5001/5100)
-builder.WebHost.ConfigureKestrel(options =>
-{
-    options.ListenLocalhost(5200);
-});
-
-
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

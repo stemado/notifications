@@ -26,9 +26,8 @@ public static class ServiceCollectionExtensions
     {
         // Database
         // Prefer the configured connection string in appsettings.json, but fall back to legacy environment variable if present
-        var connectionString = configuration.GetConnectionString("NotificationDb")
-            ?? Environment.GetEnvironmentVariable("IMPORT_PULSE_CONNECTION_STRING", EnvironmentVariableTarget.Machine)
-            ?? throw new InvalidOperationException("Notification database connection string is not configured. Set 'ConnectionStrings:NotificationDb' in configuration or the IMPORT_PULSE_CONNECTION_STRING environment variable.");
+        var connectionString = Environment.GetEnvironmentVariable("IMPORT_PULSE_CONNECTION_STRING", EnvironmentVariableTarget.Machine)
+            ?? throw new InvalidOperationException("Notification database connection string is not configured. Set 'IMPORT_PULSE_CONNECTION_STRING' in configuration or the IMPORT_PULSE_CONNECTION_STRING environment variable.");
 
         // In local development, most times Postgres is configured without SSL. Ensure we don't force SSL in dev.
         if (env.IsDevelopment())
