@@ -1,7 +1,7 @@
 namespace NotificationService.Domain.Enums;
 
 /// <summary>
-/// Defines the available notification delivery channels (Phase 2)
+/// Defines the available notification delivery channels (Phase 2+)
 /// </summary>
 public enum NotificationChannel
 {
@@ -21,7 +21,7 @@ public enum NotificationChannel
     SMS,
 
     /// <summary>
-    /// Slack notification
+    /// Microsoft Teams notification (Phase 3)
     /// </summary>
-    Slack
+    Teams
 }
