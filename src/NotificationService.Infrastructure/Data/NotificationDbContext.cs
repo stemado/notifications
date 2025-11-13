@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NotificationService.Domain.Enums;
 using NotificationService.Domain.Models;
+using NotificationService.Domain.Models.Preferences;
 using System.Text.Json;
 
 namespace NotificationService.Infrastructure.Data;
@@ -17,6 +18,8 @@ public class NotificationDbContext : DbContext
 
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<NotificationDelivery> NotificationDeliveries => Set<NotificationDelivery>();
+    public DbSet<UserNotificationPreference> UserNotificationPreferences => Set<UserNotificationPreference>();
+    public DbSet<NotificationSubscription> NotificationSubscriptions => Set<NotificationSubscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -94,6 +97,28 @@ public class NotificationDbContext : DbContext
             // Configure index
             entity.HasIndex(e => e.NotificationId)
                 .HasDatabaseName("idx_deliveries_notification");
+        });
+
+        // Configure UserNotificationPreference entity (Phase 2)
+        modelBuilder.Entity<UserNotificationPreference>(entity =>
+        {
+            entity.ToTable("UserNotificationPreferences");
+            entity.HasKey(e => new { e.UserId, e.Channel });
+
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.Channel).IsRequired().HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.MinSeverity).IsRequired().HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.Enabled).HasDefaultValue(true);
+        });
+
+        // Configure NotificationSubscription entity (Phase 2)
+        modelBuilder.Entity<NotificationSubscription>(entity =>
+        {
+            entity.ToTable("NotificationSubscriptions");
+            entity.HasKey(e => new { e.UserId, e.ClientId, e.SagaId });
+
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.MinSeverity).IsRequired().HasConversion<string>().HasMaxLength(20);
         });
     }
 }
