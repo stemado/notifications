@@ -2,7 +2,10 @@ using NotificationService.Api.Extensions;
 using NotificationService.Api.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
+const string fullUrlPath = "http://anf-srv06.antfarmllc.local:5201";
+const string localUrlPath = "http://localhost:5201";
 
+builder.WebHost.UseUrls(fullUrlPath, localUrlPath);
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
