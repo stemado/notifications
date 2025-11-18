@@ -22,10 +22,13 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "https://localhost:3000") // Update with your frontend URL
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials(); // Required for SignalR
+        policy.WithOrigins(
+            "http://localhost:3000", "https://localhost:3000",
+            "http://localhost:3001", "https://localhost:3001"
+        )
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials(); // Required for SignalR
     });
 });
 
