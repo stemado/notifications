@@ -7,27 +7,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.0" />
-    <PackageReference Include="Hangfire.Core" Version="1.8.9" />
-    <PackageReference Include="Hangfire.PostgreSql" Version="1.20.8" />
-    <!-- MimeKit for email message building (version matches Core.MicrosoftOutlookToolKit) -->
-    <PackageReference Include="MimeKit" Version="4.12.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Hangfire.Core" />
+    <PackageReference Include="Hangfire.PostgreSql" />
+    <PackageReference Include="MimeKit" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Core" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\NotificationService.Domain\NotificationService.Domain.csproj" />
-    <!-- Core.MicrosoftOutlookToolKit for Graph API email - config from file share -->
     <ProjectReference Include="..\..\..\Core.MicrosoftOutlookToolKit\Core.MicrosoftOutlookToolKit.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Added to support SignalR IHubContext<> types used by SignalRChannel -->
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
-
-    <!-- Added to support IHttpClientFactory used in Teams and Twilio services -->
-    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
   </ItemGroup>
 
 </Project>
