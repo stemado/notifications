@@ -1,5 +1,8 @@
 using NotificationService.Api.Extensions;
 using NotificationService.Api.Hubs;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 const string fullUrlPath = "http://anf-srv06.antfarmllc.local:5201";
@@ -16,6 +19,16 @@ builder.Services.AddNotifications(builder.Configuration, builder.Environment);
 
 // Add JWT authentication (Phase 3)
 builder.Services.AddJwtAuthentication(builder.Configuration);
+
+// Add Health Checks
+var connectionString = builder.Configuration.GetConnectionString("NotificationDb");
+builder.Services.AddHealthChecks()
+    .AddNpgSql(
+        connectionString ?? "Host=localhost;Database=notifications;Username=postgres;Password=postgres",
+        name: "database",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: new[] { "db", "postgres" })
+    .AddCheck("self", () => HealthCheckResult.Healthy("Service is running"), tags: new[] { "self" });
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -47,6 +60,28 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map health check endpoints
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = JsonSerializer.Serialize(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                duration = e.Value.Duration.TotalMilliseconds
+            }),
+            totalDuration = report.TotalDuration.TotalMilliseconds
+        });
+        await context.Response.WriteAsync(result);
+    }
+});
 
 // Map SignalR hub
 app.MapHub<NotificationHub>("/hubs/notifications");
