@@ -4,6 +4,10 @@ using Microsoft.Extensions.Hosting;
 using NotificationService.Api.EventHandlers;
 using NotificationService.Api.Events;
 using NotificationService.Api.Jobs;
+using NotificationService.Client.Events;
+
+// Alias to avoid ambiguity between Api and Client SagaStuckEvent
+using ApiSagaStuckEvent = NotificationService.Api.Events.SagaStuckEvent;
 using NotificationService.Infrastructure.Data;
 using NotificationService.Infrastructure.Repositories;
 using NotificationService.Infrastructure.Services;
@@ -85,7 +89,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISmsService, TwilioSmsService>();
 
         // Event handlers (Phase 1)
-        services.AddScoped<IEventHandler<SagaStuckEvent>, SagaStuckNotificationHandler>();
+        services.AddScoped<IEventHandler<ApiSagaStuckEvent>, SagaStuckNotificationHandler>();
+
+        // Event handlers (Phase 4)
+        services.AddScoped<IEventHandler<ImportCompletedEvent>, ImportCompletedNotificationHandler>();
+        services.AddScoped<IEventHandler<ImportFailedEvent>, ImportFailedNotificationHandler>();
+        services.AddScoped<IEventHandler<EscalationCreatedEvent>, EscalationCreatedNotificationHandler>();
+        services.AddScoped<IEventHandler<FileProcessingErrorEvent>, FileProcessingErrorNotificationHandler>();
 
         // Background jobs (Phase 1)
         services.AddScoped<NotificationRepeatJob>();
