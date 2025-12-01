@@ -2,13 +2,29 @@ using NotificationService.Api.Extensions;
 using NotificationService.Api.Hubs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting.WindowsServices;
 using System.Text.Json;
 
-var builder = WebApplication.CreateBuilder(args);
+// Configure for Windows Service support
+var options = new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = WindowsServiceHelpers.IsWindowsService()
+        ? AppContext.BaseDirectory
+        : default
+};
+
+var builder = WebApplication.CreateBuilder(options);
+
+// Configure URLs
 const string fullUrlPath = "http://anf-srv06.antfarmllc.local:5201";
 const string localUrlPath = "http://localhost:5201";
 
 builder.WebHost.UseUrls(fullUrlPath, localUrlPath);
+
+// Configure Windows Service support
+builder.Host.UseWindowsService();
+
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
