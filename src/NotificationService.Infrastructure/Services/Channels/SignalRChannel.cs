@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using NotificationService.Domain.Enums;
 using NotificationService.Domain.Models;
 using NotificationService.Infrastructure.Repositories;
-using Microsoft.AspNetCore.SignalR;
 
 namespace NotificationService.Infrastructure.Services.Channels;
 
