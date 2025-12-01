@@ -21,10 +21,12 @@ builder.Services.AddNotifications(builder.Configuration, builder.Environment);
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
 // Add Health Checks
-var connectionString = builder.Configuration.GetConnectionString("NotificationDb");
+// Use the same environment variable as the main database connection for consistency
+var healthCheckConnectionString = Environment.GetEnvironmentVariable("NOTIFICATIONS_CONNECTION_STRING", EnvironmentVariableTarget.Machine)
+    ?? throw new InvalidOperationException("NOTIFICATIONS_CONNECTION_STRING environment variable is not set.");
 builder.Services.AddHealthChecks()
     .AddNpgSql(
-        connectionString ?? "Host=localhost;Database=notifications;Username=postgres;Password=postgres",
+        healthCheckConnectionString,
         name: "database",
         failureStatus: HealthStatus.Unhealthy,
         tags: new[] { "db", "postgres" })
