@@ -98,6 +98,29 @@ public class EnhancedEmailService : IEmailService
         };
     }
 
+    public async Task<bool> SendEmailAsync(
+        IEnumerable<string> recipients,
+        string subject,
+        string htmlBody,
+        bool isHtml = true,
+        CancellationToken ct = default)
+    {
+        return _mode switch
+        {
+            EmailServiceMode.GraphOnly => await SendViaGraphAsync(recipients, subject, htmlBody, isHtml, ct),
+            EmailServiceMode.SmtpOnly => await SendViaSmtpAsync(recipients, subject, htmlBody, isHtml, ct),
+            EmailServiceMode.GraphWithSmtpFallback => await SendWithFallbackAsync(
+                () => SendViaGraphAsync(recipients, subject, htmlBody, isHtml, ct),
+                () => SendViaSmtpAsync(recipients, subject, htmlBody, isHtml, ct),
+                "Graph", "SMTP"),
+            EmailServiceMode.SmtpWithGraphFallback => await SendWithFallbackAsync(
+                () => SendViaSmtpAsync(recipients, subject, htmlBody, isHtml, ct),
+                () => SendViaGraphAsync(recipients, subject, htmlBody, isHtml, ct),
+                "SMTP", "Graph"),
+            _ => await SendViaGraphAsync(recipients, subject, htmlBody, isHtml, ct)
+        };
+    }
+
     private async Task<bool> SendViaGraphAsync(string toEmail, string subject, string htmlBody, string? plainTextBody)
     {
         if (_graphService == null)
@@ -118,6 +141,28 @@ public class EnhancedEmailService : IEmailService
         }
 
         return await _smtpService.SendEmailAsync(toEmail, subject, htmlBody, plainTextBody);
+    }
+
+    private async Task<bool> SendViaGraphAsync(IEnumerable<string> recipients, string subject, string htmlBody, bool isHtml, CancellationToken ct)
+    {
+        if (_graphService == null)
+        {
+            _logger.LogWarning("Graph service not available");
+            return false;
+        }
+
+        return await _graphService.SendEmailAsync(recipients, subject, htmlBody, isHtml, ct);
+    }
+
+    private async Task<bool> SendViaSmtpAsync(IEnumerable<string> recipients, string subject, string htmlBody, bool isHtml, CancellationToken ct)
+    {
+        if (_smtpService == null)
+        {
+            _logger.LogWarning("SMTP service not available");
+            return false;
+        }
+
+        return await _smtpService.SendEmailAsync(recipients, subject, htmlBody, isHtml, ct);
     }
 
     private async Task<bool> SendWithFallbackAsync(

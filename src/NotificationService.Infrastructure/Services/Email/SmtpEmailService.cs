@@ -71,4 +71,58 @@ public class SmtpEmailService : IEmailService
             return false;
         }
     }
+
+    public async Task<bool> SendEmailAsync(
+        IEnumerable<string> recipients,
+        string subject,
+        string htmlBody,
+        bool isHtml = true,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var smtpHost = _configuration["Email:SmtpHost"];
+            var smtpPort = int.Parse(_configuration["Email:SmtpPort"] ?? "587");
+            var smtpUsername = _configuration["Email:SmtpUsername"];
+            var smtpPassword = _configuration["Email:SmtpPassword"];
+            var fromEmail = _configuration["Email:FromEmail"];
+            var fromName = _configuration["Email:FromName"] ?? "Notification Service";
+            var enableSsl = bool.Parse(_configuration["Email:EnableSsl"] ?? "true");
+
+            if (string.IsNullOrEmpty(smtpHost) || string.IsNullOrEmpty(fromEmail))
+            {
+                _logger.LogWarning("Email configuration is incomplete. Email not sent.");
+                return false;
+            }
+
+            using var smtpClient = new SmtpClient(smtpHost, smtpPort)
+            {
+                EnableSsl = enableSsl,
+                Credentials = new NetworkCredential(smtpUsername, smtpPassword)
+            };
+
+            var mailMessage = new MailMessage
+            {
+                From = new MailAddress(fromEmail, fromName),
+                Subject = subject,
+                Body = htmlBody,
+                IsBodyHtml = isHtml
+            };
+
+            foreach (var recipient in recipients)
+            {
+                mailMessage.To.Add(recipient);
+            }
+
+            await smtpClient.SendMailAsync(mailMessage, ct);
+
+            _logger.LogInformation("Email sent successfully to {RecipientCount} recipients", recipients.Count());
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending email to multiple recipients");
+            return false;
+        }
+    }
 }

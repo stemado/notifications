@@ -26,7 +26,23 @@ public class GraphEmailService : IEmailService
         _logger.LogWarning(
             "GraphEmailService is not configured. Core.MicrosoftOutlookToolKit dependency is missing. " +
             "Email to {ToEmail} was not sent. Use SmtpEmailService instead.", toEmail);
-        
+
+        // Return false to indicate email was not sent - caller should fall back to SMTP
+        return Task.FromResult(false);
+    }
+
+    public Task<bool> SendEmailAsync(
+        IEnumerable<string> recipients,
+        string subject,
+        string htmlBody,
+        bool isHtml = true,
+        CancellationToken ct = default)
+    {
+        _logger.LogWarning(
+            "GraphEmailService is not configured. Core.MicrosoftOutlookToolKit dependency is missing. " +
+            "Email to {RecipientCount} recipients was not sent. Use SmtpEmailService instead.",
+            recipients.Count());
+
         // Return false to indicate email was not sent - caller should fall back to SMTP
         return Task.FromResult(false);
     }

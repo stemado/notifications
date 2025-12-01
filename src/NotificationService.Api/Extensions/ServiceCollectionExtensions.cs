@@ -11,6 +11,7 @@ using NotificationService.Infrastructure.Services.Channels;
 using NotificationService.Infrastructure.Services.Email;
 using NotificationService.Infrastructure.Services.Teams;
 using NotificationService.Infrastructure.Services.Sms;
+using NotificationService.Infrastructure.Services.Templates;
 
 namespace NotificationService.Api.Extensions;
 
@@ -56,6 +57,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUserPreferenceRepository, UserPreferenceRepository>();
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
 
+        // Repositories (Phase 0 - Email Templates)
+        services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
+
         // Core services (Phase 1)
         services.AddScoped<INotificationService, Infrastructure.Services.NotificationService>();
 
@@ -67,6 +71,9 @@ public static class ServiceCollectionExtensions
         // Email services (Phase 2)
         services.AddScoped<IEmailService, SmtpEmailService>();
         services.AddScoped<IEmailTemplateService, EmailTemplateService>();
+
+        // Template rendering services (Phase 0)
+        services.AddScoped<ITemplateRenderingService, TemplateRenderingService>();
 
         // Teams services (Phase 3)
         services.AddHttpClient("Teams");

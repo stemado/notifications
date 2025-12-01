@@ -20,6 +20,7 @@ public class NotificationDbContext : DbContext
     public DbSet<NotificationDelivery> NotificationDeliveries => Set<NotificationDelivery>();
     public DbSet<UserNotificationPreference> UserNotificationPreferences => Set<UserNotificationPreference>();
     public DbSet<NotificationSubscription> NotificationSubscriptions => Set<NotificationSubscription>();
+    public DbSet<EmailTemplate> EmailTemplates => Set<EmailTemplate>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -134,6 +135,79 @@ public class NotificationDbContext : DbContext
             entity.Property(e => e.ClientId).HasColumnName("client_id");
             entity.Property(e => e.SagaId).HasColumnName("saga_id");
             entity.Property(e => e.MinSeverity).IsRequired().HasConversion<string>().HasMaxLength(20).HasColumnName("min_severity");
+        });
+
+        // Configure EmailTemplate entity (Phase 0)
+        modelBuilder.Entity<EmailTemplate>(entity =>
+        {
+            entity.ToTable("email_templates");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .UseIdentityAlwaysColumn();
+
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnName("name");
+
+            entity.Property(e => e.Description)
+                .HasMaxLength(500)
+                .HasColumnName("description");
+
+            entity.Property(e => e.Subject)
+                .IsRequired()
+                .HasMaxLength(500)
+                .HasColumnName("subject");
+
+            entity.Property(e => e.HtmlContent)
+                .HasColumnName("html_content");
+
+            entity.Property(e => e.TextContent)
+                .HasColumnName("text_content");
+
+            entity.Property(e => e.Variables)
+                .HasColumnType("jsonb")
+                .HasColumnName("variables");
+
+            entity.Property(e => e.TestData)
+                .HasColumnType("jsonb")
+                .HasColumnName("test_data");
+
+            entity.Property(e => e.DefaultRecipients)
+                .HasColumnType("jsonb")
+                .HasColumnName("default_recipients");
+
+            entity.Property(e => e.TemplateType)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasDefaultValue("notification")
+                .HasColumnName("template_type");
+
+            entity.Property(e => e.IsActive)
+                .IsRequired()
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.UpdatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("updated_at");
+
+            // Unique index on name
+            entity.HasIndex(e => e.Name)
+                .IsUnique()
+                .HasDatabaseName("idx_email_templates_name");
+
+            // Index for active templates by type
+            entity.HasIndex(e => new { e.IsActive, e.TemplateType })
+                .HasDatabaseName("idx_email_templates_active_type");
         });
     }
 }
