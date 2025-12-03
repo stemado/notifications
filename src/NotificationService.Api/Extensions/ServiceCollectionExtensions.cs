@@ -75,6 +75,7 @@ public static class ServiceCollectionExtensions
         // Delivery tracking and channel health services
         services.AddScoped<Infrastructure.Services.Delivery.IDeliveryTrackingService, Infrastructure.Services.Delivery.DeliveryTrackingService>();
         services.AddScoped<IChannelHealthService, ChannelHealthService>();
+        services.AddScoped<IChannelConfigurationService, ChannelConfigurationService>();
 
         // Email services (Phase 2)
         services.AddScoped<IEmailService, SmtpEmailService>();

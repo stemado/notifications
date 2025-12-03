@@ -21,6 +21,7 @@ public class NotificationDbContext : DbContext
     public DbSet<UserNotificationPreference> UserNotificationPreferences => Set<UserNotificationPreference>();
     public DbSet<NotificationSubscription> NotificationSubscriptions => Set<NotificationSubscription>();
     public DbSet<EmailTemplate> EmailTemplates => Set<EmailTemplate>();
+    public DbSet<ChannelConfiguration> ChannelConfigurations => Set<ChannelConfiguration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -221,6 +222,71 @@ public class NotificationDbContext : DbContext
             // Index for active templates by type
             entity.HasIndex(e => new { e.IsActive, e.TemplateType })
                 .HasDatabaseName("idx_email_templates_active_type");
+        });
+
+        // Configure ChannelConfiguration entity
+        modelBuilder.Entity<ChannelConfiguration>(entity =>
+        {
+            entity.ToTable("channel_configurations");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .HasDefaultValueSql("gen_random_uuid()");
+
+            entity.Property(e => e.Channel)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .HasColumnName("channel");
+
+            entity.Property(e => e.Enabled)
+                .HasDefaultValue(false)
+                .HasColumnName("enabled");
+
+            entity.Property(e => e.Configured)
+                .HasDefaultValue(false)
+                .HasColumnName("configured");
+
+            entity.Property(e => e.ConfigurationJson)
+                .IsRequired()
+                .HasDefaultValue("{}")
+                .HasColumnType("jsonb")
+                .HasColumnName("configuration_json");
+
+            entity.Property(e => e.LastTestedAt)
+                .HasColumnName("last_tested_at");
+
+            entity.Property(e => e.TestStatus)
+                .HasMaxLength(20)
+                .HasColumnName("test_status");
+
+            entity.Property(e => e.TestError)
+                .HasColumnName("test_error");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.UpdatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("updated_at");
+
+            entity.Property(e => e.UpdatedBy)
+                .HasMaxLength(255)
+                .HasColumnName("updated_by");
+
+            // Unique index on channel
+            entity.HasIndex(e => e.Channel)
+                .IsUnique()
+                .HasDatabaseName("idx_channel_configurations_channel");
+
+            // Index for enabled channels
+            entity.HasIndex(e => e.Enabled)
+                .HasDatabaseName("idx_channel_configurations_enabled")
+                .HasFilter("enabled = true");
         });
     }
 }
