@@ -95,10 +95,15 @@ public class NotificationDbContext : DbContext
             entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()").HasColumnName("id");
             entity.Property(e => e.NotificationId).IsRequired().HasColumnName("notification_id");
             entity.Property(e => e.Channel).IsRequired().HasConversion<string>().HasMaxLength(20).HasColumnName("channel");
+            entity.Property(e => e.Status).IsRequired().HasConversion<string>().HasMaxLength(20).HasDefaultValueSql("'Pending'").HasColumnName("status");
             entity.Property(e => e.DeliveredAt).HasColumnName("delivered_at");
             entity.Property(e => e.FailedAt).HasColumnName("failed_at");
             entity.Property(e => e.ErrorMessage).HasColumnName("error_message");
             entity.Property(e => e.AttemptCount).HasDefaultValue(0).HasColumnName("attempt_count");
+            entity.Property(e => e.MaxAttempts).HasDefaultValue(3).HasColumnName("max_attempts");
+            entity.Property(e => e.NextRetryAt).HasColumnName("next_retry_at");
+            entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("NOW()").HasColumnName("created_at");
+            entity.Property(e => e.ResponseData).HasColumnType("jsonb").HasColumnName("response_data");
 
             // Configure relationship
             entity.HasOne(e => e.Notification)
@@ -106,9 +111,17 @@ public class NotificationDbContext : DbContext
                 .HasForeignKey(e => e.NotificationId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Configure index
+            // Configure indexes
             entity.HasIndex(e => e.NotificationId)
                 .HasDatabaseName("idx_deliveries_notification");
+
+            entity.HasIndex(e => new { e.Status, e.NextRetryAt })
+                .HasDatabaseName("idx_deliveries_queue")
+                .HasFilter("status IN ('Pending', 'Failed')");
+
+            entity.HasIndex(e => new { e.Channel, e.CreatedAt })
+                .HasDatabaseName("idx_deliveries_channel_history")
+                .IsDescending(false, true);
         });
 
         // Configure UserNotificationPreference entity (Phase 2)

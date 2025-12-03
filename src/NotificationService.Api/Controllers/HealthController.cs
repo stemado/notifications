@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using NotificationService.Infrastructure.Services.Channels;
 
 namespace NotificationService.Api.Controllers;
 
@@ -11,13 +12,16 @@ namespace NotificationService.Api.Controllers;
 public class HealthController : ControllerBase
 {
     private readonly HealthCheckService _healthCheckService;
+    private readonly IChannelHealthService _channelHealth;
     private readonly ILogger<HealthController> _logger;
 
     public HealthController(
         HealthCheckService healthCheckService,
+        IChannelHealthService channelHealth,
         ILogger<HealthController> logger)
     {
         _healthCheckService = healthCheckService;
+        _channelHealth = channelHealth;
         _logger = logger;
     }
 
@@ -26,26 +30,35 @@ public class HealthController : ControllerBase
     /// </summary>
     /// <returns>Health status with component details</returns>
     [HttpGet]
-    public async Task<ActionResult<ServiceHealthResponse>> GetHealth()
+    public async Task<ActionResult> GetHealth()
     {
         try
         {
             var report = await _healthCheckService.CheckHealthAsync();
 
-            var response = new ServiceHealthResponse
+            // Calculate uptime
+            var startTime = System.Diagnostics.Process.GetCurrentProcess().StartTime;
+            var uptime = DateTime.Now - startTime;
+            var uptimeString = $"{(int)uptime.TotalHours}h {uptime.Minutes}m";
+
+            // Get channel health
+            var channelHealthStatuses = await _channelHealth.GetAllChannelHealthAsync();
+            var channels = channelHealthStatuses.Select(h => new
             {
-                Status = report.Status.ToString(),
-                LastCheck = DateTime.UtcNow,
-                Version = GetType().Assembly.GetName().Version?.ToString() ?? "1.0.0",
-                Components = report.Entries.Select(e => new ComponentHealth
-                {
-                    Name = e.Key,
-                    Status = e.Value.Status.ToString(),
-                    Description = e.Value.Description,
-                    DurationMs = e.Value.Duration.TotalMilliseconds,
-                    Error = e.Value.Exception?.Message
-                }).ToList(),
-                TotalDurationMs = report.TotalDuration.TotalMilliseconds
+                channel = h.Channel.ToString(),
+                status = MapChannelHealthStatus(h.Status),
+                lastDeliveryAt = h.LastDeliveryAt?.ToString("o"),
+                errorCount24h = h.ErrorCount24h
+            });
+
+            // Return camelCase response matching frontend expectations
+            var response = new
+            {
+                status = MapHealthStatus(report.Status),
+                version = GetType().Assembly.GetName().Version?.ToString() ?? "1.0.0",
+                uptime = uptimeString,
+                lastCheck = DateTime.UtcNow.ToString("o"),
+                channels
             };
 
             // Return appropriate status code based on health
@@ -59,22 +72,39 @@ public class HealthController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error checking service health");
-            return StatusCode(503, new ServiceHealthResponse
+            var startTime = System.Diagnostics.Process.GetCurrentProcess().StartTime;
+            var uptime = DateTime.Now - startTime;
+            return StatusCode(503, new
             {
-                Status = "Unhealthy",
-                LastCheck = DateTime.UtcNow,
-                Version = GetType().Assembly.GetName().Version?.ToString() ?? "1.0.0",
-                Components = new List<ComponentHealth>
-                {
-                    new()
-                    {
-                        Name = "health-check",
-                        Status = "Unhealthy",
-                        Error = ex.Message
-                    }
-                }
+                status = "unhealthy",
+                version = GetType().Assembly.GetName().Version?.ToString() ?? "1.0.0",
+                uptime = $"{(int)uptime.TotalHours}h {uptime.Minutes}m",
+                lastCheck = DateTime.UtcNow.ToString("o"),
+                channels = Array.Empty<object>()
             });
         }
+    }
+
+    private static string MapChannelHealthStatus(ChannelHealthStatus status)
+    {
+        return status switch
+        {
+            ChannelHealthStatus.Healthy => "healthy",
+            ChannelHealthStatus.Degraded => "degraded",
+            ChannelHealthStatus.Unhealthy => "unhealthy",
+            _ => "unhealthy"
+        };
+    }
+
+    private static string MapHealthStatus(HealthStatus status)
+    {
+        return status switch
+        {
+            HealthStatus.Healthy => "healthy",
+            HealthStatus.Degraded => "degraded",
+            HealthStatus.Unhealthy => "unhealthy",
+            _ => "unhealthy"
+        };
     }
 
     /// <summary>
@@ -95,7 +125,7 @@ public class HealthController : ControllerBase
         try
         {
             var report = await _healthCheckService.CheckHealthAsync();
-            
+
             if (report.Status == HealthStatus.Healthy || report.Status == HealthStatus.Degraded)
             {
                 return Ok(new { status = report.Status.ToString(), timestamp = DateTime.UtcNow });
@@ -109,28 +139,4 @@ public class HealthController : ControllerBase
             return StatusCode(503, new { status = "Unhealthy", error = ex.Message });
         }
     }
-}
-
-/// <summary>
-/// Response model for service health
-/// </summary>
-public class ServiceHealthResponse
-{
-    public string Status { get; set; } = "Unknown";
-    public DateTime LastCheck { get; set; }
-    public string Version { get; set; } = "1.0.0";
-    public List<ComponentHealth> Components { get; set; } = new();
-    public double TotalDurationMs { get; set; }
-}
-
-/// <summary>
-/// Health status for individual components
-/// </summary>
-public class ComponentHealth
-{
-    public string Name { get; set; } = string.Empty;
-    public string Status { get; set; } = "Unknown";
-    public string? Description { get; set; }
-    public double DurationMs { get; set; }
-    public string? Error { get; set; }
 }

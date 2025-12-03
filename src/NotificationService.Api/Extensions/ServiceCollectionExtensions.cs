@@ -72,6 +72,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<IUserService, UserService>();
 
+        // Delivery tracking and channel health services
+        services.AddScoped<Infrastructure.Services.Delivery.IDeliveryTrackingService, Infrastructure.Services.Delivery.DeliveryTrackingService>();
+        services.AddScoped<IChannelHealthService, ChannelHealthService>();
+
         // Email services (Phase 2)
         services.AddScoped<IEmailService, SmtpEmailService>();
         services.AddScoped<IEmailTemplateService, EmailTemplateService>();

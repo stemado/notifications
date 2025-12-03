@@ -3,7 +3,8 @@ using NotificationService.Domain.Enums;
 namespace NotificationService.Domain.Models;
 
 /// <summary>
-/// Tracks delivery attempts for a notification across different channels (Phase 2)
+/// Tracks delivery attempts for a notification across different channels
+/// Supports both queued (pending) deliveries and completed delivery records
 /// </summary>
 public class NotificationDelivery
 {
@@ -18,6 +19,11 @@ public class NotificationDelivery
     /// Delivery channel used
     /// </summary>
     public NotificationChannel Channel { get; set; }
+
+    /// <summary>
+    /// Current status of this delivery
+    /// </summary>
+    public DeliveryStatus Status { get; set; }
 
     /// <summary>
     /// When the notification was successfully delivered
@@ -38,6 +44,26 @@ public class NotificationDelivery
     /// Number of delivery attempts made
     /// </summary>
     public int AttemptCount { get; set; }
+
+    /// <summary>
+    /// Maximum number of retry attempts allowed
+    /// </summary>
+    public int MaxAttempts { get; set; }
+
+    /// <summary>
+    /// When the next retry should occur (for failed deliveries)
+    /// </summary>
+    public DateTime? NextRetryAt { get; set; }
+
+    /// <summary>
+    /// When this delivery record was created
+    /// </summary>
+    public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// Raw response data from delivery service (JSON)
+    /// </summary>
+    public string? ResponseData { get; set; }
 
     /// <summary>
     /// Navigation property to parent notification
