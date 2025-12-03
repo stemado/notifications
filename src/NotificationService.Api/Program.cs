@@ -33,8 +33,11 @@ builder.Services.AddSwaggerGen();
 // Add notification services
 builder.Services.AddNotifications(builder.Configuration, builder.Environment);
 
-// Add JWT authentication (Phase 3)
-builder.Services.AddJwtAuthentication(builder.Configuration);
+// Add JWT authentication (Phase 3) - Only in Production
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Services.AddJwtAuthentication(builder.Configuration);
+}
 
 // Add Health Checks
 // Use the same environment variable as the main database connection for consistency
@@ -74,8 +77,12 @@ app.UseSwaggerUI();
 
 app.UseCors("AllowAll");
 
-app.UseAuthentication();
-app.UseAuthorization();
+// Only use authentication in Production
+if (!app.Environment.IsDevelopment())
+{
+    app.UseAuthentication();
+    app.UseAuthorization();
+}
 
 app.MapControllers();
 
