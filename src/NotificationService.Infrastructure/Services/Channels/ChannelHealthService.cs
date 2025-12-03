@@ -56,12 +56,12 @@ public class ChannelHealthService : IChannelHealthService
         var totalCount = recentDeliveries.Count;
         var successCount = recentDeliveries.Count(d => d.Status == DeliveryStatus.Delivered);
 
-        // Determine health status
-        var status = DetermineHealthStatus(totalCount, successCount, errorCount, lastSuccessfulDelivery);
-
         // Check if channel is configured (this would come from configuration in a real implementation)
         var isConfigured = IsChannelConfigured(channel);
         var isEnabled = IsChannelEnabled(channel);
+
+        // Determine health status
+        var status = DetermineHealthStatus(totalCount, successCount, errorCount, lastSuccessfulDelivery, isConfigured);
 
         return new ChannelHealth
         {
@@ -79,15 +79,25 @@ public class ChannelHealthService : IChannelHealthService
         int totalCount,
         int successCount,
         int errorCount,
-        DateTime? lastSuccessfulDelivery)
+        DateTime? lastSuccessfulDelivery,
+        bool isConfigured)
     {
-        // If no deliveries attempted, status depends on last successful delivery
+        // If no deliveries attempted, status depends on configuration and last successful delivery
         if (totalCount == 0)
         {
+            // If we have a recent successful delivery, we're healthy
             if (lastSuccessfulDelivery.HasValue && lastSuccessfulDelivery.Value > DateTime.UtcNow.AddHours(-48))
                 return ChannelHealthStatus.Healthy;
+
+            // If we have an old successful delivery, we're degraded
             if (lastSuccessfulDelivery.HasValue)
                 return ChannelHealthStatus.Degraded;
+
+            // If configured and enabled but no delivery history (fresh deployment), consider healthy
+            if (isConfigured)
+                return ChannelHealthStatus.Healthy;
+
+            // Not configured and no history = unhealthy
             return ChannelHealthStatus.Unhealthy;
         }
 
