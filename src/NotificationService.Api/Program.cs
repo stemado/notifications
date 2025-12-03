@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 // Configure for Windows Service support
 var options = new WebApplicationOptions
@@ -27,7 +28,13 @@ builder.WebHost.UseUrls(fullUrlPath, localUrlPath);
 builder.Host.UseWindowsService();
 
 // Add services to the container
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Enable string-based enum serialization for API requests/responses
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -78,17 +85,16 @@ app.UseSwaggerUI();
 
 app.UseCors("AllowAll");
 
+// In development, use middleware to inject a default system user
+// This allows the API to work without Keycloak
+// This middleware is safe to use always - it only injects a user if not authenticated
+app.UseMiddleware<DevelopmentUserMiddleware>();
+
 // Only use authentication in Production
 if (!app.Environment.IsDevelopment())
 {
     app.UseAuthentication();
     app.UseAuthorization();
-}
-else
-{
-    // In development, use middleware to inject a default system user
-    // This allows the API to work without Keycloak during development
-    app.UseMiddleware<DevelopmentUserMiddleware>();
 }
 
 app.MapControllers();
