@@ -1,5 +1,6 @@
 using NotificationService.Api.Extensions;
 using NotificationService.Api.Hubs;
+using NotificationService.Api.Middleware;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting.WindowsServices;
@@ -82,6 +83,12 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseAuthentication();
     app.UseAuthorization();
+}
+else
+{
+    // In development, use middleware to inject a default system user
+    // This allows the API to work without Keycloak during development
+    app.UseMiddleware<DevelopmentUserMiddleware>();
 }
 
 app.MapControllers();
