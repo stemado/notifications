@@ -7,6 +7,11 @@ using Microsoft.Extensions.Hosting.WindowsServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+// Enable Npgsql legacy timestamp behavior to handle DateTime with unspecified Kind
+// This must be called before any Npgsql connection is made
+// See: https://www.npgsql.org/doc/types/datetime.html
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 // Configure for Windows Service support
 var options = new WebApplicationOptions
 {
