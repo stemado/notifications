@@ -71,7 +71,9 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins(
             "http://localhost:3000", "https://localhost:3000",
-            "http://localhost:3001", "https://localhost:3001"
+            "http://localhost:3001", "https://localhost:3001",
+            "http://192.168.150.52:3000", "https://192.168.150.52:3000",
+            "http://anf-srv06.antfarmllc.local:3000", "https://anf-srv06.antfarmllc.local:3000"
         )
         .AllowAnyMethod()
         .AllowAnyHeader()
