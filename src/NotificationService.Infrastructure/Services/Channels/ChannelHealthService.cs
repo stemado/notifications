@@ -21,6 +21,25 @@ public class ChannelHealthService : IChannelHealthService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Gets channel configuration from database, returns defaults if not found
+    /// </summary>
+    private async Task<(bool IsEnabled, bool IsConfigured)> GetChannelConfigurationAsync(NotificationChannel channel)
+    {
+        var config = await _context.ChannelConfigurations
+            .FirstOrDefaultAsync(c => c.Channel == channel);
+
+        if (config != null)
+        {
+            return (config.Enabled, config.Configured);
+        }
+
+        // Default: SignalR is always configured/enabled, others are not
+        return channel == NotificationChannel.SignalR
+            ? (true, true)
+            : (false, false);
+    }
+
     public async Task<List<ChannelHealth>> GetAllChannelHealthAsync()
     {
         var allChannels = Enum.GetValues<NotificationChannel>();
@@ -56,9 +75,8 @@ public class ChannelHealthService : IChannelHealthService
         var totalCount = recentDeliveries.Count;
         var successCount = recentDeliveries.Count(d => d.Status == DeliveryStatus.Delivered);
 
-        // Check if channel is configured (this would come from configuration in a real implementation)
-        var isConfigured = IsChannelConfigured(channel);
-        var isEnabled = IsChannelEnabled(channel);
+        // Get channel configuration from database
+        var (isEnabled, isConfigured) = await GetChannelConfigurationAsync(channel);
 
         // Determine health status
         var status = DetermineHealthStatus(totalCount, successCount, errorCount, lastSuccessfulDelivery, isConfigured);
@@ -71,7 +89,7 @@ public class ChannelHealthService : IChannelHealthService
             ErrorCount24h = errorCount,
             Enabled = isEnabled,
             Configured = isConfigured,
-            Config = GetChannelConfig(channel)
+            Config = await GetChannelConfigAsync(channel)
         };
     }
 
@@ -115,51 +133,63 @@ public class ChannelHealthService : IChannelHealthService
         return ChannelHealthStatus.Unhealthy;
     }
 
-    private static bool IsChannelConfigured(NotificationChannel channel)
+    /// <summary>
+    /// Gets sanitized configuration info from database (no secrets)
+    /// </summary>
+    private async Task<Dictionary<string, object>?> GetChannelConfigAsync(NotificationChannel channel)
     {
-        // In a real implementation, this would check configuration
-        // For now, SignalR is always configured (in-memory), others depend on env vars
-        return channel switch
-        {
-            NotificationChannel.SignalR => true,
-            NotificationChannel.Email => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SMTP_HOST")),
-            NotificationChannel.SMS => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TWILIO_ACCOUNT_SID")),
-            NotificationChannel.Teams => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TEAMS_WEBHOOK_URL")),
-            _ => false
-        };
-    }
+        var config = await _context.ChannelConfigurations
+            .FirstOrDefaultAsync(c => c.Channel == channel);
 
-    private static bool IsChannelEnabled(NotificationChannel channel)
-    {
-        // In a real implementation, this would check feature flags or configuration
-        // For now, all configured channels are enabled
-        return IsChannelConfigured(channel);
-    }
-
-    private static Dictionary<string, object>? GetChannelConfig(NotificationChannel channel)
-    {
-        // Return sanitized configuration info (no secrets)
-        return channel switch
+        if (config == null || string.IsNullOrEmpty(config.ConfigurationJson))
         {
-            NotificationChannel.SignalR => new Dictionary<string, object>
+            // Return default config for SignalR (always configured)
+            if (channel == NotificationChannel.SignalR)
             {
-                ["type"] = "in-memory",
-                ["hubPath"] = "/notificationHub"
-            },
-            NotificationChannel.Email => IsChannelConfigured(NotificationChannel.Email) ? new Dictionary<string, object>
+                return new Dictionary<string, object>
+                {
+                    ["type"] = "in-memory",
+                    ["hubPath"] = "/notificationHub"
+                };
+            }
+            return null;
+        }
+
+        try
+        {
+            // Parse the stored JSON and return sanitized version
+            var configDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(config.ConfigurationJson);
+
+            // Return sanitized config based on channel type
+            return channel switch
             {
-                ["provider"] = "SMTP",
-                ["host"] = Environment.GetEnvironmentVariable("SMTP_HOST") ?? "not-configured"
-            } : null,
-            NotificationChannel.SMS => IsChannelConfigured(NotificationChannel.SMS) ? new Dictionary<string, object>
-            {
-                ["provider"] = "Twilio"
-            } : null,
-            NotificationChannel.Teams => IsChannelConfigured(NotificationChannel.Teams) ? new Dictionary<string, object>
-            {
-                ["provider"] = "WebhookConnector"
-            } : null,
-            _ => null
-        };
+                NotificationChannel.SignalR => new Dictionary<string, object>
+                {
+                    ["type"] = "in-memory",
+                    ["hubPath"] = "/notificationHub"
+                },
+                NotificationChannel.Email => config.Configured ? new Dictionary<string, object>
+                {
+                    ["provider"] = configDict?.GetValueOrDefault("provider")?.ToString() ?? "SMTP",
+                    ["configured"] = true
+                } : null,
+                NotificationChannel.SMS => config.Configured ? new Dictionary<string, object>
+                {
+                    ["provider"] = "Twilio",
+                    ["configured"] = true
+                } : null,
+                NotificationChannel.Teams => config.Configured ? new Dictionary<string, object>
+                {
+                    ["provider"] = "WebhookConnector",
+                    ["configured"] = true
+                } : null,
+                _ => null
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse configuration for channel {Channel}", channel);
+            return null;
+        }
     }
 }
