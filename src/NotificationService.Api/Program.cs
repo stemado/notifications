@@ -83,14 +83,34 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// CORS must be first to ensure headers are added even on errors
+app.UseCors("AllowAll");
+
+// Add global exception handler to ensure CORS headers are preserved on errors
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        
+        var error = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var errorMessage = error?.Error?.Message ?? "An unexpected error occurred";
+        
+        await context.Response.WriteAsync(JsonSerializer.Serialize(new 
+        { 
+            message = errorMessage,
+            status = 500 
+        }));
+    });
+});
+
 // Configure the HTTP request pipeline
 app.UseSwagger();
 app.UseSwaggerUI();
 
 // Don't redirect to HTTPS in development
 // app.UseHttpsRedirection();
-
-app.UseCors("AllowAll");
 
 // In development, use middleware to inject a default system user
 // This allows the API to work without Keycloak
