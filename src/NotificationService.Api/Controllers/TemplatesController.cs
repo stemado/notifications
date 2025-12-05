@@ -371,37 +371,49 @@ public class TemplatesController : ControllerBase
               ?? new Dictionary<string, object>();
 
         _logger.LogInformation(
-            "Sending templated email: {TemplateName} to {RecipientCount} recipients",
+            "Sending templated email: {TemplateName} to {RecipientCount} recipients via {Provider}",
             request.TemplateName,
-            request.Recipients.Count);
+            request.Recipients.Count,
+            _emailService.CurrentProvider);
 
         // Render template
         var renderedSubject = _renderingService.RenderTemplate(template.Subject, templateData);
         var renderedBody = _renderingService.RenderTemplate(template.HtmlContent ?? string.Empty, templateData);
 
         // Send email via email service
-        var success = await _emailService.SendEmailAsync(
+        var result = await _emailService.SendEmailAsync(
             request.Recipients,
             renderedSubject,
             renderedBody,
             true, // isHtml
             ct);
 
-        if (success)
+        if (result.Success)
         {
-            _logger.LogInformation("Email sent successfully using template: {TemplateName}", request.TemplateName);
+            _logger.LogInformation(
+                "Email sent successfully using template: {TemplateName}, MessageId: {MessageId}, Provider: {Provider}",
+                request.TemplateName,
+                result.MessageId,
+                result.Provider);
+
             return Ok(new SendEmailResponse(
                 Success: true,
-                Message: "Email sent successfully",
-                SentAt: DateTime.UtcNow
+                MessageId: result.MessageId,
+                Message: $"Email sent successfully via {result.Provider}",
+                SentAt: result.SentAt
             ));
         }
 
-        _logger.LogWarning("Email send failed for template: {TemplateName}", request.TemplateName);
+        _logger.LogWarning(
+            "Email send failed for template: {TemplateName}. Provider: {Provider}, Error: {Error}",
+            request.TemplateName,
+            result.Provider,
+            result.ErrorMessage);
+
         return BadRequest(new SendEmailResponse(
             Success: false,
-            ErrorMessage: "Failed to send email",
-            Message: "Email send failed"
+            ErrorMessage: result.ErrorMessage,
+            Message: $"Email send failed via {result.Provider}: {result.ErrorMessage}"
         ));
     }
 

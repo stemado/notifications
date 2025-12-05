@@ -62,22 +62,22 @@ public class EmailChannel : INotificationChannel
             var plainTextBody = _templateService.RenderNotificationPlainText(notification);
 
             // Send email
-            var success = await _emailService.SendEmailAsync(userEmail, subject, htmlBody, plainTextBody);
+            var result = await _emailService.SendEmailAsync(userEmail, subject, htmlBody, plainTextBody);
 
-            if (success)
+            if (result.Success)
             {
                 delivery.DeliveredAt = DateTime.UtcNow;
                 _logger.LogInformation(
-                    "Email notification {NotificationId} delivered to {UserEmail}",
-                    notification.Id, userEmail);
+                    "Email notification {NotificationId} delivered to {UserEmail} via {Provider}",
+                    notification.Id, userEmail, result.Provider);
             }
             else
             {
                 delivery.FailedAt = DateTime.UtcNow;
-                delivery.ErrorMessage = "Failed to send email";
+                delivery.ErrorMessage = result.ErrorMessage ?? "Failed to send email";
                 _logger.LogWarning(
-                    "Failed to deliver email notification {NotificationId} to {UserEmail}",
-                    notification.Id, userEmail);
+                    "Failed to deliver email notification {NotificationId} to {UserEmail}. Error: {Error}",
+                    notification.Id, userEmail, result.ErrorMessage);
             }
         }
         catch (Exception ex)

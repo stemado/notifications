@@ -19,8 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NotificationService.Domain\NotificationService.Domain.csproj" />
-    <!-- Core.MicrosoftOutlookToolKit not available - GraphEmailService is disabled -->
-    <!-- <ProjectReference Include="..\..\..\Core.MicrosoftOutlookToolKit\Core.MicrosoftOutlookToolKit.csproj" /> -->
+    <!-- Core.MicrosoftOutlookToolKit for Microsoft Graph API email support -->
+    <PackageReference Include="Core.MicrosoftOutlookToolKit" />
   </ItemGroup>
 
 </Project>

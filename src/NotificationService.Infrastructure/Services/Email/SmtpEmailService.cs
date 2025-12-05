@@ -1,128 +1,147 @@
 using System.Net;
 using System.Net.Mail;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace NotificationService.Infrastructure.Services.Email;
 
 /// <summary>
-/// Email service implementation using SMTP
+/// Email service implementation using SMTP.
+/// Supports both local development servers (Papercut) and production SMTP servers.
 /// </summary>
 public class SmtpEmailService : IEmailService
 {
     private readonly ILogger<SmtpEmailService> _logger;
-    private readonly IConfiguration _configuration;
+    private readonly SmtpOptions _options;
 
-    public SmtpEmailService(ILogger<SmtpEmailService> logger, IConfiguration configuration)
+    public SmtpEmailService(ILogger<SmtpEmailService> logger, IOptions<EmailProviderOptions> options)
     {
         _logger = logger;
-        _configuration = configuration;
+        _options = options.Value.Smtp;
     }
 
-    public async Task<bool> SendEmailAsync(string toEmail, string subject, string htmlBody, string? plainTextBody = null)
+    public EmailProvider CurrentProvider => EmailProvider.Smtp;
+
+    public async Task<EmailSendResult> SendEmailAsync(string toEmail, string subject, string htmlBody, string? plainTextBody = null, CancellationToken ct = default)
     {
-        try
-        {
-            var smtpHost = _configuration["Email:SmtpHost"];
-            var smtpPort = int.Parse(_configuration["Email:SmtpPort"] ?? "587");
-            var smtpUsername = _configuration["Email:SmtpUsername"];
-            var smtpPassword = _configuration["Email:SmtpPassword"];
-            var fromEmail = _configuration["Email:FromEmail"];
-            var fromName = _configuration["Email:FromName"] ?? "Notification Service";
-            var enableSsl = bool.Parse(_configuration["Email:EnableSsl"] ?? "true");
-
-            if (string.IsNullOrEmpty(smtpHost) || string.IsNullOrEmpty(fromEmail))
-            {
-                _logger.LogWarning("Email configuration is incomplete. Email not sent.");
-                return false;
-            }
-
-            using var smtpClient = new SmtpClient(smtpHost, smtpPort)
-            {
-                EnableSsl = enableSsl,
-                Credentials = new NetworkCredential(smtpUsername, smtpPassword)
-            };
-
-            var mailMessage = new MailMessage
-            {
-                From = new MailAddress(fromEmail, fromName),
-                Subject = subject,
-                Body = htmlBody,
-                IsBodyHtml = true
-            };
-
-            mailMessage.To.Add(toEmail);
-
-            // Add plain text alternative if provided
-            if (!string.IsNullOrEmpty(plainTextBody))
-            {
-                var plainView = AlternateView.CreateAlternateViewFromString(plainTextBody, null, "text/plain");
-                mailMessage.AlternateViews.Add(plainView);
-            }
-
-            await smtpClient.SendMailAsync(mailMessage);
-
-            _logger.LogInformation("Email sent successfully to {ToEmail}", toEmail);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending email to {ToEmail}", toEmail);
-            return false;
-        }
+        return await SendEmailAsync(new[] { toEmail }, subject, htmlBody, true, ct);
     }
 
-    public async Task<bool> SendEmailAsync(
+    public async Task<EmailSendResult> SendEmailAsync(
         IEnumerable<string> recipients,
         string subject,
         string htmlBody,
         bool isHtml = true,
         CancellationToken ct = default)
     {
+        var recipientList = recipients.ToList();
+
+        // Validate configuration
+        if (string.IsNullOrEmpty(_options.Host))
+        {
+            _logger.LogError("SMTP Host is not configured");
+            return EmailSendResult.ConfigurationError("SMTP Host is not configured", EmailProvider.Smtp);
+        }
+
+        if (string.IsNullOrEmpty(_options.FromEmail))
+        {
+            _logger.LogError("SMTP FromEmail is not configured");
+            return EmailSendResult.ConfigurationError("From email address is not configured", EmailProvider.Smtp);
+        }
+
+        // For non-dev servers, require credentials
+        if (!_options.IsLocalDevServer && string.IsNullOrEmpty(_options.Username))
+        {
+            _logger.LogError("SMTP credentials required for production servers");
+            return EmailSendResult.ConfigurationError("SMTP credentials are required for production servers", EmailProvider.Smtp);
+        }
+
         try
         {
-            var smtpHost = _configuration["Email:SmtpHost"];
-            var smtpPort = int.Parse(_configuration["Email:SmtpPort"] ?? "587");
-            var smtpUsername = _configuration["Email:SmtpUsername"];
-            var smtpPassword = _configuration["Email:SmtpPassword"];
-            var fromEmail = _configuration["Email:FromEmail"];
-            var fromName = _configuration["Email:FromName"] ?? "Notification Service";
-            var enableSsl = bool.Parse(_configuration["Email:EnableSsl"] ?? "true");
+            _logger.LogInformation(
+                "Sending email via SMTP ({Host}:{Port}) to {RecipientCount} recipients. Subject: {Subject}",
+                _options.Host,
+                _options.Port,
+                recipientList.Count,
+                subject);
 
-            if (string.IsNullOrEmpty(smtpHost) || string.IsNullOrEmpty(fromEmail))
-            {
-                _logger.LogWarning("Email configuration is incomplete. Email not sent.");
-                return false;
-            }
-
-            using var smtpClient = new SmtpClient(smtpHost, smtpPort)
-            {
-                EnableSsl = enableSsl,
-                Credentials = new NetworkCredential(smtpUsername, smtpPassword)
-            };
-
-            var mailMessage = new MailMessage
-            {
-                From = new MailAddress(fromEmail, fromName),
-                Subject = subject,
-                Body = htmlBody,
-                IsBodyHtml = isHtml
-            };
-
-            foreach (var recipient in recipients)
-            {
-                mailMessage.To.Add(recipient);
-            }
+            using var smtpClient = CreateSmtpClient();
+            using var mailMessage = CreateMailMessage(recipientList, subject, htmlBody, isHtml);
 
             await smtpClient.SendMailAsync(mailMessage, ct);
 
-            _logger.LogInformation("Email sent successfully to {RecipientCount} recipients", recipients.Count());
-            return true;
+            var messageId = Guid.NewGuid().ToString();
+            _logger.LogInformation(
+                "Email sent successfully via SMTP. MessageId: {MessageId}, Recipients: {Recipients}",
+                messageId,
+                string.Join(", ", recipientList));
+
+            return EmailSendResult.Successful(messageId, EmailProvider.Smtp);
+        }
+        catch (SmtpException ex)
+        {
+            _logger.LogError(ex, "SMTP error sending email to {Recipients}. Status: {StatusCode}",
+                string.Join(", ", recipientList), ex.StatusCode);
+            return EmailSendResult.Failed($"SMTP error: {ex.Message} (Status: {ex.StatusCode})", EmailProvider.Smtp, ex);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error sending email to multiple recipients");
-            return false;
+            _logger.LogError(ex, "Error sending email to {Recipients}", string.Join(", ", recipientList));
+            return EmailSendResult.Failed($"Failed to send email: {ex.Message}", EmailProvider.Smtp, ex);
         }
+    }
+
+    public Task<bool> ValidateConfigurationAsync(CancellationToken ct = default)
+    {
+        var isValid = !string.IsNullOrEmpty(_options.Host) &&
+                      !string.IsNullOrEmpty(_options.FromEmail) &&
+                      (_options.IsLocalDevServer || !string.IsNullOrEmpty(_options.Username));
+
+        if (!isValid)
+        {
+            _logger.LogWarning(
+                "SMTP configuration validation failed. Host: {Host}, FromEmail: {FromEmail}, IsLocalDev: {IsLocal}, HasCredentials: {HasCreds}",
+                _options.Host ?? "(not set)",
+                _options.FromEmail ?? "(not set)",
+                _options.IsLocalDevServer,
+                !string.IsNullOrEmpty(_options.Username));
+        }
+
+        return Task.FromResult(isValid);
+    }
+
+    private SmtpClient CreateSmtpClient()
+    {
+        var client = new SmtpClient(_options.Host, _options.Port)
+        {
+            EnableSsl = _options.EnableSsl,
+            DeliveryMethod = SmtpDeliveryMethod.Network
+        };
+
+        // For local dev servers like Papercut, no credentials needed
+        if (!_options.IsLocalDevServer && !string.IsNullOrEmpty(_options.Username))
+        {
+            client.Credentials = new NetworkCredential(_options.Username, _options.Password);
+        }
+
+        return client;
+    }
+
+    private MailMessage CreateMailMessage(List<string> recipients, string subject, string body, bool isHtml)
+    {
+        var mailMessage = new MailMessage
+        {
+            From = new MailAddress(_options.FromEmail, _options.FromName),
+            Subject = subject,
+            Body = body,
+            IsBodyHtml = isHtml
+        };
+
+        foreach (var recipient in recipients)
+        {
+            mailMessage.To.Add(recipient);
+        }
+
+        return mailMessage;
     }
 }

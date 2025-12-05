@@ -77,8 +77,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IChannelHealthService, ChannelHealthService>();
         services.AddScoped<IChannelConfigurationService, ChannelConfigurationService>();
 
-        // Email services (Phase 2)
-        services.AddScoped<IEmailService, SmtpEmailService>();
+        // Email services (Phase 2) - Factory pattern for provider selection
+        // Provider is configured via "Email:Provider" setting: "Smtp" or "MicrosoftGraph"
+        services.Configure<EmailProviderOptions>(configuration.GetSection(EmailProviderOptions.SectionName));
+        services.AddSingleton<IEmailServiceFactory, EmailServiceFactory>();
+        services.AddScoped<IEmailService, FactoryBasedEmailService>();
         services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 
         // Template rendering services (Phase 0)
