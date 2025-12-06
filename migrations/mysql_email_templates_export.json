@@ -1,0 +1,184 @@
+{
+  "exported_at": "2025-12-05",
+  "source": "MySQL import_pulse.email_templates",
+  "target": "PostgreSQL NotificationService.email_templates",
+  "total_templates": 19,
+  "templates": [
+    {
+      "id": 1,
+      "name": "Import Completion",
+      "description": null,
+      "subject": "{{ ClientName }} Import Processing Complete - {{ ImportDate }}",
+      "template_type": "notification",
+      "is_active": true,
+      "variables": {"Status": "Processing status", "ClientName": "Client name", "ImportDate": "Import date", "ReportTime": "Report time", "FileDetails": "Array of file details", "ReferenceId": "Reference ID", "FilesExpected": "Number of files expected", "RecordsFailed": "Number of records failed", "FilesCompleted": "Number of files completed", "RecordsImported": "Number of records imported"}
+    },
+    {
+      "id": 2,
+      "name": "Import Failed",
+      "description": null,
+      "subject": "{{ ClientName }} Import Processing Failed - {{ ImportDate }}",
+      "template_type": "notification",
+      "is_active": true,
+      "variables": {"FailedAt": "Time of failure", "SessionId": "Session ID", "ClientName": "Client name", "ImportDate": "Import date", "ErrorMessage": "Error message", "FilesExpected": "Number of files expected", "FilesCompleted": "Number of files completed"}
+    },
+    {
+      "id": 3,
+      "name": "Import Validation Report",
+      "description": null,
+      "subject": "Import Validation Report - {{ ClientName }} - {{ FileName }}",
+      "template_type": "notification",
+      "is_active": true,
+      "variables": {"FileName": "File name", "HasErrors": "Whether there are errors", "ClientName": "Client name", "ErrorRecords": "Error records count", "TotalRecords": "Total records", "ValidRecords": "Valid records count", "ProcessingTime": "Processing time in seconds", "ValidationDate": "Validation date", "WarningRecords": "Warning records count", "ValidationResults": "Array of validation results"}
+    },
+    {
+      "id": 4,
+      "name": "Import Timeout",
+      "description": null,
+      "subject": "{{ ClientName }} Import Timeout Alert - {{ ImportDate }}",
+      "template_type": "notification",
+      "is_active": true,
+      "variables": {"ClientName": "Client name", "ImportDate": "Import date", "ReferenceId": "Reference ID", "TimeoutHours": "Number of timeout hours", "FilesExpected": "Number of files expected", "RecordsFailed": "Number of records failed", "FilesCompleted": "Number of files completed", "RecordsImported": "Number of records imported"}
+    },
+    {
+      "id": 5,
+      "name": "Loss of Coverage Report",
+      "description": "Notification for loss of coverage and rejection report",
+      "subject": "{{ ClientName }} - Loss of Coverage and Rejection Report From Census Received {{ ProcessingDate }}",
+      "template_type": "notification",
+      "is_active": true,
+      "variables": {"ClientName": "Client name", "RejectedCount": "Number of rejected records", "ProcessingDate": "Date of processing"}
+    },
+    {
+      "id": 6,
+      "name": "No Changes Found",
+      "description": "Notification when no changes are found in census processing",
+      "subject": "{{ ClientName }} {{ ImportType }} Census - No Changes Found - {{ CurrentDate }}",
+      "template_type": "notification",
+      "is_active": true,
+      "variables": {"Status": "Processing status", "ClientName": "Client name", "ImportType": "Type of import", "CurrentDate": "Current date", "ProcessingEnd": "Processing end time", "ChangesDetected": "Number of changes detected", "ProcessingStart": "Processing start time"}
+    },
+    {
+      "id": 7,
+      "name": "Census Processing Complete",
+      "description": "Daily import history report for successful processing",
+      "subject": "{{ ClientName }} Census Processing Complete - {{ ReportDate }}",
+      "template_type": "report",
+      "is_active": true,
+      "variables": {"ClientName": "Client name", "ReportDate": "Report date", "ReportTime": "Report time", "ReferenceId": "Reference ID", "TotalImports": "Total imports processed", "ImportSummaries": "Array of import summaries", "HasFailedRecords": "Whether there are failed records", "HasSkippedRecords": "Whether there are skipped records", "RequiresAttention": "Whether attention is required", "HasUnmatchedRecords": "Whether there are unmatched records"}
+    },
+    {
+      "id": 8,
+      "name": "Census Processing Failed",
+      "description": "Notification when census processing fails",
+      "subject": "{{ ClientName }} Census Processing Failed - {{ ReportDate }}",
+      "template_type": "alert",
+      "is_active": true,
+      "variables": {"FailedAt": "Time of failure", "ClientName": "Client name", "ReportDate": "Report date", "CensusFileId": "Census file ID", "ErrorMessage": "Error message"}
+    },
+    {
+      "id": 9,
+      "name": "Census Validation Report",
+      "description": "Validation report for census files",
+      "subject": "Census Validation Report - {{ ClientName }} - {{ FileName }}",
+      "template_type": "report",
+      "is_active": true,
+      "variables": {"FileName": "File name", "HasErrors": "Whether there are errors", "ClientName": "Client name", "ErrorRecords": "Error records count", "TotalRecords": "Total records", "ValidRecords": "Valid records count", "ProcessingTime": "Processing time in seconds", "ValidationDate": "Validation date", "WarningRecords": "Warning records count", "SourceValidationResults": "Validation results array"}
+    },
+    {
+      "id": 10,
+      "name": "Data Awaiting",
+      "description": "Sent when initial import check finds no data available. Informs about automatic retry schedule.",
+      "subject": "{{ client_name }} Import Check - Data Not Yet Available - {{ import_date }}",
+      "template_type": "notification",
+      "is_active": true,
+      "variables": ["max_wait_hours", "import_date", "max_retries", "import_type", "next_retry_at", "support_email", "retry_interval", "check_time", "missing_import_types", "session_id", "client_name", "retry_count", "check_type"]
+    },
+    {
+      "id": 11,
+      "name": "Partial Complete",
+      "description": "Sent when some but not all expected import data is available. Shows completeness percentage.",
+      "subject": "{{ client_name }} Import Check - Partial Data Available - {{ import_date }}",
+      "template_type": "notification",
+      "is_active": true,
+      "variables": ["import_date", "max_retries", "import_type", "next_retry_at", "support_email", "expected_import_types", "check_time", "session_id", "client_name", "retry_count", "check_type", "data_completeness"]
+    },
+    {
+      "id": 12,
+      "name": "Max Retries Partial",
+      "description": "Sent when maximum retry attempts reached with missing data. Requires manual intervention.",
+      "subject": "{{ client_name }} Import Check - Action Required - {{ import_date }}",
+      "template_type": "notification",
+      "is_active": true,
+      "variables": ["missing_types", "import_date", "available_types", "max_retries", "initial_check_time", "elapsed_hours", "import_type", "support_email", "expected_import_types", "check_time", "session_id", "last_check_time", "client_name", "retry_count", "check_type", "data_completeness"]
+    },
+    {
+      "id": 13,
+      "name": "Error Alert",
+      "description": "Sent when a system error occurs during import checking. Requires immediate attention.",
+      "subject": "{{ client_name }} Import Check - Error Alert - {{ import_date }}",
+      "template_type": "notification",
+      "is_active": true,
+      "variables": ["error_timestamp", "support_phone", "error_context", "import_date", "error_message", "error_code", "max_retries", "error_type", "next_retry_at", "support_email", "error_time", "error_id", "session_id", "client_name", "retry_count", "check_type"]
+    },
+    {
+      "id": 14,
+      "name": "Timeout Warning",
+      "description": null,
+      "subject": "Import Timeout Warning - {{ client_name }}",
+      "template_type": "notification",
+      "is_active": true,
+      "variables": ["client_name", "current_state", "current_wait_time", "minutes_until_timeout", "timeout_time", "import_summary", "import_date", "support_email"]
+    },
+    {
+      "id": 15,
+      "name": "File Detection Alert",
+      "description": "Default template for file detection notifications",
+      "subject": "File Detected: {FileName}",
+      "template_type": "file_detected",
+      "is_active": true,
+      "variables": null
+    },
+    {
+      "id": 16,
+      "name": "Validation Failed Alert",
+      "description": "Default template for validation failure notifications",
+      "subject": "Validation Failed: {FileName}",
+      "template_type": "validation_failed",
+      "is_active": true,
+      "variables": null
+    },
+    {
+      "id": 17,
+      "name": "Archive Complete Alert",
+      "description": "Default template for archive completion notifications",
+      "subject": "Archive Complete: {FileName}",
+      "template_type": "archive_completed",
+      "is_active": true,
+      "variables": null
+    },
+    {
+      "id": 18,
+      "name": "Workflow Triggered Alert",
+      "description": "Default template for workflow trigger notifications",
+      "subject": "Workflow Started: {ClientName} - {FileName}",
+      "template_type": "workflow_triggered",
+      "is_active": true,
+      "variables": ["FileName", "ClientId", "ClientName", "FilePath", "sagaId", "DetectedAt"]
+    },
+    {
+      "id": 19,
+      "name": "Cal.ImportPulse - Census Processing Complete",
+      "description": "Cal.ImportPulse - Daily import history report for successful processing",
+      "subject": "{{ ClientName }} Census Processing Complete - {{ ReportDate }}",
+      "template_type": "notification",
+      "is_active": true,
+      "variables": {"ClientName": "Client name", "ReportDate": "Report date", "ReportTime": "Report time", "ReferenceId": "Reference ID", "TotalImports": "Total imports processed", "ImportSummaries": "Array of import summaries", "HasFailedRecords": "Whether there are failed records", "HasSkippedRecords": "Whether there are skipped records", "RequiresAttention": "Whether attention is required", "HasUnmatchedRecords": "Whether there are unmatched records"}
+    }
+  ],
+  "notes": [
+    "Templates 10-14 use Jinja2 syntax ({{ var | filter }}, {% elif %}) that needs conversion to Scriban/Liquid",
+    "Templates 15-17 use simple {placeholder} syntax - NOT Jinja2/Scriban",
+    "Run Migrate-EmailTemplates.ps1 to convert Jinja2 -> Scriban/Liquid syntax"
+  ]
+}
