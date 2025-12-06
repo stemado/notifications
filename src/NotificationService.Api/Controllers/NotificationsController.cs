@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR;
-using NotificationService.Api.Hubs;
 using NotificationService.Domain.DTOs;
 using NotificationService.Domain.Models;
 using NotificationService.Infrastructure.Services;
@@ -16,16 +14,16 @@ namespace NotificationService.Api.Controllers;
 public class NotificationsController : ControllerBase
 {
     private readonly INotificationService _notificationService;
-    private readonly IHubContext<NotificationHub> _hubContext;
+    private readonly INotificationDispatcher _dispatcher;
     private readonly ILogger<NotificationsController> _logger;
 
     public NotificationsController(
         INotificationService notificationService,
-        IHubContext<NotificationHub> hubContext,
+        INotificationDispatcher dispatcher,
         ILogger<NotificationsController> logger)
     {
         _notificationService = notificationService;
-        _hubContext = hubContext;
+        _dispatcher = dispatcher;
         _logger = logger;
     }
 
@@ -104,7 +102,7 @@ public class NotificationsController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new notification
+    /// Creates a new notification and dispatches it to all enabled channels
     /// </summary>
     [HttpPost]
     public async Task<ActionResult<Notification>> CreateNotification([FromBody] CreateNotificationRequest request)
@@ -113,20 +111,10 @@ public class NotificationsController : ControllerBase
         {
             var notification = await _notificationService.CreateAsync(request);
 
-            // Push via SignalR
-            await _hubContext.Clients
-                .User(notification.UserId.ToString())
-                .SendAsync("NewNotification", notification);
+            // Dispatch to all enabled channels (SignalR, Email, SMS, etc.) with delivery tracking
+            await _dispatcher.DispatchAsync(notification);
 
-            // If for ops team, also send to ops-team group
-            if (notification.TenantId == null)
-            {
-                await _hubContext.Clients
-                    .Group("ops-team")
-                    .SendAsync("NewNotification", notification);
-            }
-
-            _logger.LogInformation("Created notification {NotificationId} for user {UserId}",
+            _logger.LogInformation("Created and dispatched notification {NotificationId} for user {UserId}",
                 notification.Id, notification.UserId);
 
             return CreatedAtAction(nameof(GetNotification), new { id = notification.Id }, notification);
@@ -139,7 +127,7 @@ public class NotificationsController : ControllerBase
     }
 
     /// <summary>
-    /// Creates or updates a notification using GroupKey
+    /// Creates or updates a notification using GroupKey and dispatches to all enabled channels
     /// </summary>
     [HttpPost("create-or-update")]
     public async Task<ActionResult<Notification>> CreateOrUpdateNotification([FromBody] CreateNotificationRequest request)
@@ -148,20 +136,10 @@ public class NotificationsController : ControllerBase
         {
             var notification = await _notificationService.CreateOrUpdateAsync(request);
 
-            // Push via SignalR
-            await _hubContext.Clients
-                .User(notification.UserId.ToString())
-                .SendAsync("NewNotification", notification);
+            // Dispatch to all enabled channels (SignalR, Email, SMS, etc.) with delivery tracking
+            await _dispatcher.DispatchAsync(notification);
 
-            // If for ops team, also send to ops-team group
-            if (notification.TenantId == null)
-            {
-                await _hubContext.Clients
-                    .Group("ops-team")
-                    .SendAsync("NewNotification", notification);
-            }
-
-            _logger.LogInformation("Created or updated notification {NotificationId} for user {UserId}",
+            _logger.LogInformation("Created or updated and dispatched notification {NotificationId} for user {UserId}",
                 notification.Id, notification.UserId);
 
             return Ok(notification);

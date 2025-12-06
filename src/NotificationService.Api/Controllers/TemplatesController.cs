@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using NotificationService.Domain.Enums;
 using NotificationService.Domain.Models;
 using NotificationService.Infrastructure.Repositories;
 using NotificationService.Infrastructure.Services.Templates;
@@ -19,17 +20,20 @@ public class TemplatesController : ControllerBase
     private readonly IEmailTemplateRepository _templateRepository;
     private readonly ITemplateRenderingService _renderingService;
     private readonly IEmailService _emailService;
+    private readonly INotificationDeliveryRepository _deliveryRepository;
     private readonly ILogger<TemplatesController> _logger;
 
     public TemplatesController(
         IEmailTemplateRepository templateRepository,
         ITemplateRenderingService renderingService,
         IEmailService emailService,
+        INotificationDeliveryRepository deliveryRepository,
         ILogger<TemplatesController> logger)
     {
         _templateRepository = templateRepository ?? throw new ArgumentNullException(nameof(templateRepository));
         _renderingService = renderingService ?? throw new ArgumentNullException(nameof(renderingService));
         _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
+        _deliveryRepository = deliveryRepository ?? throw new ArgumentNullException(nameof(deliveryRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -346,7 +350,7 @@ public class TemplatesController : ControllerBase
     // ==================== Email Sending Endpoints ====================
 
     /// <summary>
-    /// POST /api/templates/send - Send an email using a template
+    /// POST /api/templates/send - Send an email using a template with delivery tracking
     /// </summary>
     [HttpPost("send")]
     [ProducesResponseType(typeof(SendEmailResponse), StatusCodes.Status200OK)]
@@ -380,41 +384,104 @@ public class TemplatesController : ControllerBase
         var renderedSubject = _renderingService.RenderTemplate(template.Subject, templateData);
         var renderedBody = _renderingService.RenderTemplate(template.HtmlContent ?? string.Empty, templateData);
 
-        // Send email via email service
-        var result = await _emailService.SendEmailAsync(
-            request.Recipients,
-            renderedSubject,
-            renderedBody,
-            true, // isHtml
-            ct);
-
-        if (result.Success)
+        // Create delivery record for tracking BEFORE sending
+        var delivery = new NotificationDelivery
         {
-            _logger.LogInformation(
-                "Email sent successfully using template: {TemplateName}, MessageId: {MessageId}, Provider: {Provider}",
-                request.TemplateName,
-                result.MessageId,
-                result.Provider);
+            Id = Guid.NewGuid(),
+            NotificationId = Guid.Empty, // Ad-hoc email, not tied to a notification
+            Channel = NotificationChannel.Email,
+            Status = DeliveryStatus.Processing,
+            AttemptCount = 1,
+            MaxAttempts = 1,
+            CreatedAt = DateTime.UtcNow
+        };
 
-            return Ok(new SendEmailResponse(
-                Success: true,
-                MessageId: result.MessageId,
-                Message: $"Email sent successfully via {result.Provider}",
-                SentAt: result.SentAt
+        try
+        {
+            // Send email via email service
+            var result = await _emailService.SendEmailAsync(
+                request.Recipients,
+                renderedSubject,
+                renderedBody,
+                true, // isHtml
+                ct);
+
+            if (result.Success)
+            {
+                // Update delivery record with success
+                delivery.Status = DeliveryStatus.Delivered;
+                delivery.DeliveredAt = DateTime.UtcNow;
+                delivery.ResponseData = JsonSerializer.Serialize(new
+                {
+                    messageId = result.MessageId,
+                    provider = result.Provider,
+                    templateName = request.TemplateName,
+                    recipients = request.Recipients,
+                    subject = renderedSubject
+                });
+
+                await _deliveryRepository.CreateAsync(delivery);
+
+                _logger.LogInformation(
+                    "Email sent and tracked: {TemplateName}, MessageId: {MessageId}, DeliveryId: {DeliveryId}, Provider: {Provider}",
+                    request.TemplateName,
+                    result.MessageId,
+                    delivery.Id,
+                    result.Provider);
+
+                return Ok(new SendEmailResponse(
+                    Success: true,
+                    MessageId: result.MessageId,
+                    DeliveryId: delivery.Id,
+                    Message: $"Email sent and tracked via {result.Provider}",
+                    SentAt: result.SentAt
+                ));
+            }
+
+            // Update delivery record with failure
+            delivery.Status = DeliveryStatus.Failed;
+            delivery.FailedAt = DateTime.UtcNow;
+            delivery.ErrorMessage = result.ErrorMessage;
+            delivery.ResponseData = JsonSerializer.Serialize(new
+            {
+                provider = result.Provider,
+                templateName = request.TemplateName,
+                recipients = request.Recipients,
+                error = result.ErrorMessage
+            });
+
+            await _deliveryRepository.CreateAsync(delivery);
+
+            _logger.LogWarning(
+                "Email send failed and tracked: {TemplateName}, DeliveryId: {DeliveryId}, Provider: {Provider}, Error: {Error}",
+                request.TemplateName,
+                delivery.Id,
+                result.Provider,
+                result.ErrorMessage);
+
+            return BadRequest(new SendEmailResponse(
+                Success: false,
+                DeliveryId: delivery.Id,
+                ErrorMessage: result.ErrorMessage,
+                Message: $"Email send failed via {result.Provider}: {result.ErrorMessage}"
             ));
         }
+        catch (Exception ex)
+        {
+            // Record exception in delivery tracking
+            delivery.Status = DeliveryStatus.Failed;
+            delivery.FailedAt = DateTime.UtcNow;
+            delivery.ErrorMessage = ex.Message;
 
-        _logger.LogWarning(
-            "Email send failed for template: {TemplateName}. Provider: {Provider}, Error: {Error}",
-            request.TemplateName,
-            result.Provider,
-            result.ErrorMessage);
+            await _deliveryRepository.CreateAsync(delivery);
 
-        return BadRequest(new SendEmailResponse(
-            Success: false,
-            ErrorMessage: result.ErrorMessage,
-            Message: $"Email send failed via {result.Provider}: {result.ErrorMessage}"
-        ));
+            _logger.LogError(ex,
+                "Email send exception tracked: {TemplateName}, DeliveryId: {DeliveryId}",
+                request.TemplateName,
+                delivery.Id);
+
+            throw;
+        }
     }
 
     // ==================== Health Check Endpoint ====================
@@ -586,10 +653,11 @@ public record SendTemplatedEmailRequest(
     string? TemplateData = null
 );
 
-/// <summary>Send email response</summary>
+/// <summary>Send email response with delivery tracking</summary>
 public record SendEmailResponse(
     bool Success,
     string? MessageId = null,
+    Guid? DeliveryId = null,
     string? ErrorMessage = null,
     string? Message = null,
     DateTime? SentAt = null
