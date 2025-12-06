@@ -21,19 +21,25 @@ public class TemplatesController : ControllerBase
     private readonly ITemplateRenderingService _renderingService;
     private readonly IEmailService _emailService;
     private readonly INotificationDeliveryRepository _deliveryRepository;
+    private readonly INotificationRepository _notificationRepository;
     private readonly ILogger<TemplatesController> _logger;
+
+    // System user ID for ad-hoc/test emails sent via API
+    private static readonly Guid SystemUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     public TemplatesController(
         IEmailTemplateRepository templateRepository,
         ITemplateRenderingService renderingService,
         IEmailService emailService,
         INotificationDeliveryRepository deliveryRepository,
+        INotificationRepository notificationRepository,
         ILogger<TemplatesController> logger)
     {
         _templateRepository = templateRepository ?? throw new ArgumentNullException(nameof(templateRepository));
         _renderingService = renderingService ?? throw new ArgumentNullException(nameof(renderingService));
         _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
         _deliveryRepository = deliveryRepository ?? throw new ArgumentNullException(nameof(deliveryRepository));
+        _notificationRepository = notificationRepository ?? throw new ArgumentNullException(nameof(notificationRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -384,11 +390,32 @@ public class TemplatesController : ControllerBase
         var renderedSubject = _renderingService.RenderTemplate(template.Subject, templateData);
         var renderedBody = _renderingService.RenderTemplate(template.HtmlContent ?? string.Empty, templateData);
 
-        // Create delivery record for tracking BEFORE sending
+        // Create a Notification record for audit trail (ad-hoc/test emails must be tracked)
+        var notification = new Notification
+        {
+            Id = Guid.NewGuid(),
+            UserId = SystemUserId,
+            Severity = NotificationSeverity.Info,
+            Title = $"Email: {renderedSubject}",
+            Message = $"Templated email sent to {string.Join(", ", request.Recipients)} using template '{request.TemplateName}'",
+            EventType = "AdHocEmail",
+            CreatedAt = DateTime.UtcNow,
+            AcknowledgedAt = DateTime.UtcNow, // Auto-acknowledge since this is a send action
+            Metadata = new Dictionary<string, object>
+            {
+                ["templateName"] = request.TemplateName,
+                ["recipients"] = request.Recipients,
+                ["subject"] = renderedSubject
+            }
+        };
+
+        await _notificationRepository.CreateAsync(notification);
+
+        // Create delivery record for tracking linked to the notification
         var delivery = new NotificationDelivery
         {
             Id = Guid.NewGuid(),
-            NotificationId = Guid.Empty, // Ad-hoc email, not tied to a notification
+            NotificationId = notification.Id,
             Channel = NotificationChannel.Email,
             Status = DeliveryStatus.Processing,
             AttemptCount = 1,
