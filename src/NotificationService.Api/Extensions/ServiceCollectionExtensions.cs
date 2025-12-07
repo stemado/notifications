@@ -16,6 +16,7 @@ using NotificationService.Infrastructure.Services.Email;
 using NotificationService.Infrastructure.Services.Teams;
 using NotificationService.Infrastructure.Services.Sms;
 using NotificationService.Infrastructure.Services.Templates;
+using NotificationService.Routing.Extensions;
 
 namespace NotificationService.Api.Extensions;
 
@@ -154,6 +155,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<INotificationChannel, EmailChannel>();
         services.AddScoped<INotificationChannel, TeamsChannel>();
         services.AddScoped<INotificationChannel, SmsChannel>();
+
+        // Routing bounded context (outbound notifications to external recipients)
+        services.AddRoutingServices(configuration, env);
 
         return services;
     }
