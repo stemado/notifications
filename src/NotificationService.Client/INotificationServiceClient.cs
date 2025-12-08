@@ -116,6 +116,39 @@ public interface INotificationServiceClient
         FileProcessingErrorEvent evt,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Publishes an SLABreachEvent to create an appropriate notification.
+    /// </summary>
+    /// <param name="evt">The event details</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Response with notification ID</returns>
+    /// <exception cref="NotificationServiceException">Thrown when the request fails</exception>
+    Task<NotificationResponse> PublishSLABreachEventAsync(
+        SLABreachEvent evt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Publishes a PlanSourceOperationFailedEvent to create an appropriate notification.
+    /// </summary>
+    /// <param name="evt">The event details</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Response with notification ID</returns>
+    /// <exception cref="NotificationServiceException">Thrown when the request fails</exception>
+    Task<NotificationResponse> PublishPlanSourceOperationFailedEventAsync(
+        PlanSourceOperationFailedEvent evt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Publishes an AggregateGenerationStalledEvent to create an appropriate notification.
+    /// </summary>
+    /// <param name="evt">The event details</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Response with notification ID</returns>
+    /// <exception cref="NotificationServiceException">Thrown when the request fails</exception>
+    Task<NotificationResponse> PublishAggregateGenerationStalledEventAsync(
+        AggregateGenerationStalledEvent evt,
+        CancellationToken cancellationToken = default);
+
     #endregion
 
     #region Health Check

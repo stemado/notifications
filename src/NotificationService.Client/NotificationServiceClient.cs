@@ -332,6 +332,137 @@ public class NotificationServiceClient : INotificationServiceClient
         return await CreateOrUpdateNotificationAsync(request, cancellationToken);
     }
 
+    public async Task<NotificationResponse> PublishSLABreachEventAsync(
+        SLABreachEvent evt,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
+        _logger.LogWarning("Publishing SLABreachEvent: SagaId={SagaId}, ClientId={ClientId}, SLAType={SLAType}, Actual={ActualMinutes}min vs Threshold={ThresholdMinutes}min",
+            evt.SagaId, evt.ClientId, evt.SLAType, evt.ActualMinutes, evt.ThresholdMinutes);
+
+        var request = new CreateNotificationRequest
+        {
+            UserId = SystemUserId,
+            TenantId = evt.TenantId,
+            Severity = evt.Severity,
+            Title = $"SLA Breach: {evt.SLAType} - {evt.ClientName}",
+            Message = $"Workflow {evt.SagaId} exceeded SLA threshold. Actual: {evt.ActualMinutes} minutes vs Threshold: {evt.ThresholdMinutes} minutes. Current state: {evt.CurrentState}",
+            SagaId = evt.SagaId,
+            ClientId = ParseGuidOrDefault(evt.ClientId),
+            EventType = nameof(SLABreachEvent),
+            GroupKey = $"sla:breach:{evt.SagaId}:{evt.SLAType}",
+            RequiresAck = evt.Severity >= NotificationSeverity.Urgent,
+            RepeatInterval = evt.Severity >= NotificationSeverity.Critical ? 15 : null,
+            Metadata = new Dictionary<string, object>
+            {
+                ["clientId"] = evt.ClientId,
+                ["clientName"] = evt.ClientName,
+                ["slaType"] = evt.SLAType,
+                ["thresholdMinutes"] = evt.ThresholdMinutes,
+                ["actualMinutes"] = evt.ActualMinutes,
+                ["currentState"] = evt.CurrentState,
+                ["correlationId"] = evt.CorrelationId ?? string.Empty
+            },
+            Actions = new List<NotificationAction>
+            {
+                new() { Label = "View Workflow", Url = $"/workflows/{evt.SagaId}", ActionType = "link" }
+            }
+        };
+
+        return await CreateOrUpdateNotificationAsync(request, cancellationToken);
+    }
+
+    public async Task<NotificationResponse> PublishPlanSourceOperationFailedEventAsync(
+        PlanSourceOperationFailedEvent evt,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
+        _logger.LogWarning("Publishing PlanSourceOperationFailedEvent: SagaId={SagaId}, ClientId={ClientId}, Operation={Operation}, IsRetryable={IsRetryable}",
+            evt.SagaId, evt.ClientId, evt.OperationType, evt.IsRetryable);
+
+        var request = new CreateNotificationRequest
+        {
+            UserId = SystemUserId,
+            TenantId = evt.TenantId,
+            Severity = evt.Severity,
+            Title = $"PlanSource {evt.OperationType} Failed: {evt.ClientName}",
+            Message = $"PlanSource operation '{evt.OperationType}' failed for workflow {evt.SagaId}. " +
+                      $"Error: {evt.ErrorMessage}. " +
+                      $"Attempt {evt.AttemptNumber}/{evt.MaxRetries}. " +
+                      (evt.IsRetryable ? "Will retry automatically." : "Non-retryable - requires manual intervention."),
+            SagaId = evt.SagaId,
+            ClientId = ParseGuidOrDefault(evt.ClientId),
+            EventType = nameof(PlanSourceOperationFailedEvent),
+            GroupKey = $"plansource:failed:{evt.SagaId}:{evt.OperationType}",
+            RequiresAck = !evt.IsRetryable,
+            Metadata = new Dictionary<string, object>
+            {
+                ["clientId"] = evt.ClientId,
+                ["clientName"] = evt.ClientName,
+                ["operationType"] = evt.OperationType,
+                ["errorMessage"] = evt.ErrorMessage,
+                ["errorCode"] = evt.ErrorCode ?? string.Empty,
+                ["isRetryable"] = evt.IsRetryable,
+                ["attemptNumber"] = evt.AttemptNumber,
+                ["maxRetries"] = evt.MaxRetries,
+                ["currentState"] = evt.CurrentState,
+                ["correlationId"] = evt.CorrelationId ?? string.Empty
+            },
+            Actions = new List<NotificationAction>
+            {
+                new() { Label = "View Workflow", Url = $"/workflows/{evt.SagaId}", ActionType = "link" },
+                new() { Label = "Force Retry", Url = $"/api/workflows/{evt.SagaId}/retry", ActionType = "action" }
+            }
+        };
+
+        return await CreateOrUpdateNotificationAsync(request, cancellationToken);
+    }
+
+    public async Task<NotificationResponse> PublishAggregateGenerationStalledEventAsync(
+        AggregateGenerationStalledEvent evt,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
+        _logger.LogWarning("Publishing AggregateGenerationStalledEvent: SagaId={SagaId}, ClientId={ClientId}, WaitCount={WaitCount}/{MaxWait}, MinutesWaiting={Minutes}",
+            evt.SagaId, evt.ClientId, evt.WaitCount, evt.MaxWaitCount, evt.MinutesWaiting);
+
+        var request = new CreateNotificationRequest
+        {
+            UserId = SystemUserId,
+            TenantId = evt.TenantId,
+            Severity = evt.Severity,
+            Title = $"Aggregate Stalled: {evt.ClientName}",
+            Message = $"Aggregate generation appears stalled for workflow {evt.SagaId}. " +
+                      $"Checked {evt.WaitCount}/{evt.MaxWaitCount} times over {evt.MinutesWaiting} minutes. " +
+                      (evt.FileName != null ? $"File: {evt.FileName}" : ""),
+            SagaId = evt.SagaId,
+            ClientId = ParseGuidOrDefault(evt.ClientId),
+            EventType = nameof(AggregateGenerationStalledEvent),
+            GroupKey = $"aggregate:stalled:{evt.SagaId}",
+            RequiresAck = evt.WaitCount >= evt.MaxWaitCount,
+            Metadata = new Dictionary<string, object>
+            {
+                ["clientId"] = evt.ClientId,
+                ["clientName"] = evt.ClientName,
+                ["waitCount"] = evt.WaitCount,
+                ["maxWaitCount"] = evt.MaxWaitCount,
+                ["minutesWaiting"] = evt.MinutesWaiting,
+                ["fileName"] = evt.FileName ?? string.Empty,
+                ["correlationId"] = evt.CorrelationId ?? string.Empty
+            },
+            Actions = new List<NotificationAction>
+            {
+                new() { Label = "View Workflow", Url = $"/workflows/{evt.SagaId}", ActionType = "link" },
+                new() { Label = "Check Aggregate", Url = $"/api/workflows/{evt.SagaId}/check-aggregate", ActionType = "action" }
+            }
+        };
+
+        return await CreateOrUpdateNotificationAsync(request, cancellationToken);
+    }
+
     #endregion
 
     #region Health Check

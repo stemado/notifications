@@ -6,8 +6,11 @@ using NotificationService.Api.Events;
 using NotificationService.Api.Jobs;
 using NotificationService.Client.Events;
 
-// Alias to avoid ambiguity between Api and Client SagaStuckEvent
+// Aliases to avoid ambiguity between Api and Client event types
 using ApiSagaStuckEvent = NotificationService.Api.Events.SagaStuckEvent;
+using ApiSLABreachEvent = NotificationService.Api.Events.SLABreachEvent;
+using ApiPlanSourceOperationFailedEvent = NotificationService.Api.Events.PlanSourceOperationFailedEvent;
+using ApiAggregateGenerationStalledEvent = NotificationService.Api.Events.AggregateGenerationStalledEvent;
 using NotificationService.Infrastructure.Data;
 using NotificationService.Infrastructure.Repositories;
 using NotificationService.Infrastructure.Services;
@@ -105,6 +108,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEventHandler<ImportFailedEvent>, ImportFailedNotificationHandler>();
         services.AddScoped<IEventHandler<EscalationCreatedEvent>, EscalationCreatedNotificationHandler>();
         services.AddScoped<IEventHandler<FileProcessingErrorEvent>, FileProcessingErrorNotificationHandler>();
+
+        // Event handlers (Phase 6 - Supervisor Pattern Integration)
+        services.AddScoped<IEventHandler<ApiSLABreachEvent>, SLABreachNotificationHandler>();
+        services.AddScoped<IEventHandler<ApiPlanSourceOperationFailedEvent>, PlanSourceOperationFailedNotificationHandler>();
+        services.AddScoped<IEventHandler<ApiAggregateGenerationStalledEvent>, AggregateGenerationStalledNotificationHandler>();
 
         // Background jobs (Phase 1)
         services.AddScoped<NotificationRepeatJob>();

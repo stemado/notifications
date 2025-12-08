@@ -2,9 +2,15 @@ using Microsoft.AspNetCore.Mvc;
 using NotificationService.Api.Events;
 using NotificationService.Client.Events;
 
-// Alias to avoid ambiguity between Api and Client SagaStuckEvent
+// Aliases to avoid ambiguity between Api and Client event types
 using ApiSagaStuckEvent = NotificationService.Api.Events.SagaStuckEvent;
 using ClientSagaStuckEvent = NotificationService.Client.Events.SagaStuckEvent;
+using ApiSLABreachEvent = NotificationService.Api.Events.SLABreachEvent;
+using ClientSLABreachEvent = NotificationService.Client.Events.SLABreachEvent;
+using ApiPlanSourceOperationFailedEvent = NotificationService.Api.Events.PlanSourceOperationFailedEvent;
+using ClientPlanSourceOperationFailedEvent = NotificationService.Client.Events.PlanSourceOperationFailedEvent;
+using ApiAggregateGenerationStalledEvent = NotificationService.Api.Events.AggregateGenerationStalledEvent;
+using ClientAggregateGenerationStalledEvent = NotificationService.Client.Events.AggregateGenerationStalledEvent;
 
 namespace NotificationService.Api.Controllers;
 
@@ -22,6 +28,9 @@ public class EventsController : ControllerBase
     private readonly IEventHandler<ImportFailedEvent> _importFailedHandler;
     private readonly IEventHandler<EscalationCreatedEvent> _escalationCreatedHandler;
     private readonly IEventHandler<FileProcessingErrorEvent> _fileProcessingErrorHandler;
+    private readonly IEventHandler<ApiSLABreachEvent> _slaBreachHandler;
+    private readonly IEventHandler<ApiPlanSourceOperationFailedEvent> _planSourceFailedHandler;
+    private readonly IEventHandler<ApiAggregateGenerationStalledEvent> _aggregateStalledHandler;
     private readonly ILogger<EventsController> _logger;
 
     public EventsController(
@@ -30,6 +39,9 @@ public class EventsController : ControllerBase
         IEventHandler<ImportFailedEvent> importFailedHandler,
         IEventHandler<EscalationCreatedEvent> escalationCreatedHandler,
         IEventHandler<FileProcessingErrorEvent> fileProcessingErrorHandler,
+        IEventHandler<ApiSLABreachEvent> slaBreachHandler,
+        IEventHandler<ApiPlanSourceOperationFailedEvent> planSourceFailedHandler,
+        IEventHandler<ApiAggregateGenerationStalledEvent> aggregateStalledHandler,
         ILogger<EventsController> logger)
     {
         _sagaStuckHandler = sagaStuckHandler;
@@ -37,6 +49,9 @@ public class EventsController : ControllerBase
         _importFailedHandler = importFailedHandler;
         _escalationCreatedHandler = escalationCreatedHandler;
         _fileProcessingErrorHandler = fileProcessingErrorHandler;
+        _slaBreachHandler = slaBreachHandler;
+        _planSourceFailedHandler = planSourceFailedHandler;
+        _aggregateStalledHandler = aggregateStalledHandler;
         _logger = logger;
     }
 
@@ -153,5 +168,128 @@ public class EventsController : ControllerBase
         await _fileProcessingErrorHandler.Handle(evt);
 
         return Accepted(new { message = "Event processed", clientId = evt.ClientId, errorType = evt.ErrorType });
+    }
+
+    /// <summary>
+    /// Process an SLA breach event
+    /// </summary>
+    [HttpPost("sla-breach")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> HandleSLABreach([FromBody] ClientSLABreachEvent evt)
+    {
+        if (evt.SagaId == Guid.Empty)
+        {
+            return BadRequest(new { error = "SagaId is required" });
+        }
+
+        _logger.LogWarning("Received SLABreachEvent: SagaId={SagaId}, ClientId={ClientId}, SLAType={SLAType}",
+            evt.SagaId, evt.ClientId, evt.SLAType);
+
+        var apiEvent = new ApiSLABreachEvent
+        {
+            SagaId = evt.SagaId,
+            ClientId = Guid.TryParse(evt.ClientId, out var clientGuid) ? clientGuid : Guid.Empty,
+            ClientName = evt.ClientName,
+            SLAType = evt.SLAType,
+            ThresholdMinutes = evt.ThresholdMinutes,
+            ActualMinutes = evt.ActualMinutes,
+            CurrentState = evt.CurrentState,
+            Severity = MapSeverity(evt.Severity),
+            DetectedAt = evt.DetectedAt,
+            TenantId = evt.TenantId,
+            CorrelationId = evt.CorrelationId
+        };
+
+        await _slaBreachHandler.Handle(apiEvent);
+
+        return Accepted(new { message = "Event processed", sagaId = evt.SagaId });
+    }
+
+    /// <summary>
+    /// Process a PlanSource operation failed event
+    /// </summary>
+    [HttpPost("plansource-failed")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> HandlePlanSourceOperationFailed([FromBody] ClientPlanSourceOperationFailedEvent evt)
+    {
+        if (evt.SagaId == Guid.Empty)
+        {
+            return BadRequest(new { error = "SagaId is required" });
+        }
+
+        _logger.LogWarning("Received PlanSourceOperationFailedEvent: SagaId={SagaId}, ClientId={ClientId}, Operation={Operation}",
+            evt.SagaId, evt.ClientId, evt.OperationType);
+
+        var apiEvent = new ApiPlanSourceOperationFailedEvent
+        {
+            SagaId = evt.SagaId,
+            ClientId = Guid.TryParse(evt.ClientId, out var clientGuid) ? clientGuid : Guid.Empty,
+            ClientName = evt.ClientName,
+            OperationType = evt.OperationType,
+            ErrorMessage = evt.ErrorMessage,
+            ErrorCode = evt.ErrorCode,
+            IsRetryable = evt.IsRetryable,
+            AttemptNumber = evt.AttemptNumber,
+            MaxRetries = evt.MaxRetries,
+            CurrentState = evt.CurrentState,
+            Severity = MapSeverity(evt.Severity),
+            FailedAt = evt.FailedAt,
+            TenantId = evt.TenantId,
+            CorrelationId = evt.CorrelationId
+        };
+
+        await _planSourceFailedHandler.Handle(apiEvent);
+
+        return Accepted(new { message = "Event processed", sagaId = evt.SagaId });
+    }
+
+    /// <summary>
+    /// Process an aggregate generation stalled event
+    /// </summary>
+    [HttpPost("aggregate-stalled")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> HandleAggregateGenerationStalled([FromBody] ClientAggregateGenerationStalledEvent evt)
+    {
+        if (evt.SagaId == Guid.Empty)
+        {
+            return BadRequest(new { error = "SagaId is required" });
+        }
+
+        _logger.LogWarning("Received AggregateGenerationStalledEvent: SagaId={SagaId}, ClientId={ClientId}, WaitCount={WaitCount}",
+            evt.SagaId, evt.ClientId, evt.WaitCount);
+
+        var apiEvent = new ApiAggregateGenerationStalledEvent
+        {
+            SagaId = evt.SagaId,
+            ClientId = Guid.TryParse(evt.ClientId, out var clientGuid) ? clientGuid : Guid.Empty,
+            ClientName = evt.ClientName,
+            WaitCount = evt.WaitCount,
+            MaxWaitCount = evt.MaxWaitCount,
+            MinutesWaiting = evt.MinutesWaiting,
+            FileName = evt.FileName,
+            Severity = MapSeverity(evt.Severity),
+            DetectedAt = evt.DetectedAt,
+            TenantId = evt.TenantId,
+            CorrelationId = evt.CorrelationId
+        };
+
+        await _aggregateStalledHandler.Handle(apiEvent);
+
+        return Accepted(new { message = "Event processed", sagaId = evt.SagaId });
+    }
+
+    private static Domain.Enums.NotificationSeverity MapSeverity(Client.Models.NotificationSeverity severity)
+    {
+        return severity switch
+        {
+            Client.Models.NotificationSeverity.Info => Domain.Enums.NotificationSeverity.Info,
+            Client.Models.NotificationSeverity.Warning => Domain.Enums.NotificationSeverity.Warning,
+            Client.Models.NotificationSeverity.Urgent => Domain.Enums.NotificationSeverity.Urgent,
+            Client.Models.NotificationSeverity.Critical => Domain.Enums.NotificationSeverity.Critical,
+            _ => Domain.Enums.NotificationSeverity.Info
+        };
     }
 }
