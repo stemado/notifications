@@ -23,6 +23,9 @@ var options = new WebApplicationOptions
 
 var builder = WebApplication.CreateBuilder(options);
 
+// Add Aspire ServiceDefaults for OpenTelemetry, health checks, and service discovery
+builder.AddServiceDefaults();
+
 // Configure URLs
 const string fullUrlPath = "http://anf-srv06.antfarmllc.local:5201";
 const string localUrlPath = "http://localhost:5201";
@@ -150,5 +153,8 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 
 // Map SignalR hub
 app.MapHub<NotificationHub>("/hubs/notifications");
+
+// Map Aspire default health check endpoints (/health and /alive)
+app.MapDefaultEndpoints();
 
 app.Run();

@@ -1,10 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Aspire ServiceDefaults for telemetry, health checks, and service discovery -->
+    <ProjectReference Include="..\..\..\Aspire\PlanSourceAutomation.ServiceDefaults\PlanSourceAutomation.ServiceDefaults.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
