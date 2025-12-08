@@ -27,10 +27,14 @@ var builder = WebApplication.CreateBuilder(options);
 builder.AddServiceDefaults();
 
 // Configure URLs
-const string fullUrlPath = "http://anf-srv06.antfarmllc.local:5201";
-const string localUrlPath = "http://localhost:5201";
-
-builder.WebHost.UseUrls(fullUrlPath, localUrlPath);
+// Skip when running under Aspire (which manages URLs via ASPNETCORE_URLS)
+var isAspireManaged = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT"));
+if (!isAspireManaged)
+{
+    const string fullUrlPath = "http://anf-srv06.antfarmllc.local:5201";
+    const string localUrlPath = "http://localhost:5201";
+    builder.WebHost.UseUrls(fullUrlPath, localUrlPath);
+}
 
 // Configure Windows Service support
 builder.Host.UseWindowsService();
