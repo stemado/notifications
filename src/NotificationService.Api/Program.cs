@@ -28,7 +28,10 @@ builder.AddServiceDefaults();
 
 // Configure URLs
 // Skip when running under Aspire (which manages URLs via ASPNETCORE_URLS)
-var isAspireManaged = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT"));
+// Check for ASPNETCORE_URLS (set by Aspire) OR OTEL_EXPORTER_OTLP_ENDPOINT (set for telemetry)
+var aspnetCoreUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+var otelEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+var isAspireManaged = !string.IsNullOrEmpty(aspnetCoreUrls) || !string.IsNullOrEmpty(otelEndpoint);
 if (!isAspireManaged)
 {
     const string fullUrlPath = "http://anf-srv06.antfarmllc.local:5201";
