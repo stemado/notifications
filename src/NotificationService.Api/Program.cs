@@ -68,8 +68,8 @@ builder.Services.AddHealthChecks()
         healthCheckConnectionString,
         name: "database",
         failureStatus: HealthStatus.Unhealthy,
-        tags: new[] { "db", "postgres" })
-    .AddCheck("self", () => HealthCheckResult.Healthy("Service is running"), tags: new[] { "self" });
+        tags: new[] { "db", "postgres" });
+    // Note: "self" health check is already registered by AddServiceDefaults()
 
 // Add CORS
 builder.Services.AddCors(options =>
