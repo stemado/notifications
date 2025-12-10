@@ -60,7 +60,7 @@ public class RoutingController : ControllerBase
             TemplateId = request.TemplateId,
             Subject = request.Subject,
             Body = request.Body,
-            Payload = request.Payload ?? new Dictionary<string, object>(),
+            Payload = request.Payload ?? new Dictionary<string, System.Text.Json.JsonElement>(),
             SagaId = request.SagaId,
             CorrelationId = request.CorrelationId
         };

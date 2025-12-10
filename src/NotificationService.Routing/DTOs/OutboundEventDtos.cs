@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NotificationService.Domain.Enums;
 using NotificationService.Routing.Domain.Enums;
 
@@ -15,7 +16,7 @@ public record PublishEventRequest
     public string? TemplateId { get; init; }
     public string? Subject { get; init; }
     public string? Body { get; init; }
-    public Dictionary<string, object>? Payload { get; init; }
+    public Dictionary<string, JsonElement>? Payload { get; init; }
     public Guid? SagaId { get; init; }
     public Guid? CorrelationId { get; init; }
 }
@@ -53,7 +54,7 @@ public record OutboundEventDetails
     public string? TemplateId { get; init; }
     public string? Subject { get; init; }
     public string? Body { get; init; }
-    public Dictionary<string, object> Payload { get; init; } = new();
+    public Dictionary<string, JsonElement> Payload { get; init; } = new();
     public Guid? SagaId { get; init; }
     public Guid? CorrelationId { get; init; }
     public DateTime CreatedAt { get; init; }

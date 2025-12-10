@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NotificationService.Domain.Enums;
 using NotificationService.Routing.Domain.Enums;
 
@@ -48,9 +49,10 @@ public class OutboundEvent
     public string? Body { get; set; }
 
     /// <summary>
-    /// Additional payload data for template rendering
+    /// Additional payload data for template rendering.
+    /// Using JsonElement for proper JSON round-tripping.
     /// </summary>
-    public Dictionary<string, object> Payload { get; set; } = new();
+    public Dictionary<string, JsonElement> Payload { get; set; } = new();
 
     // Tracking
     /// <summary>
