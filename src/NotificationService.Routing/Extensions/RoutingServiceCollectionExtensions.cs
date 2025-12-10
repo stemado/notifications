@@ -1,10 +1,14 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using NotificationService.Routing.Consumers;
 using NotificationService.Routing.Data;
+using NotificationService.Routing.Messaging;
 using NotificationService.Routing.Repositories;
 using NotificationService.Routing.Services;
+using NotificationService.Routing.Services.Channels;
 
 namespace NotificationService.Routing.Extensions;
 
@@ -64,6 +68,15 @@ public static class RoutingServiceCollectionExtensions
         services.AddScoped<IOutboundRouter, OutboundRouter>();
         services.AddScoped<IRoutingDashboardService, RoutingDashboardService>();
 
+        // Channel dispatcher for routing deliveries to Email/SMS/Teams
+        services.AddScoped<IChannelDispatcher, ChannelDispatcher>();
+
+        // Message publisher for outbound deliveries
+        services.AddScoped<IDeliveryMessagePublisher, DeliveryMessagePublisher>();
+
+        // MassTransit with RabbitMQ and EF Core Outbox
+        services.AddMassTransitForRouting(configuration);
+
         return services;
     }
 
@@ -104,5 +117,73 @@ public static class RoutingServiceCollectionExtensions
             sb.Append("Maximum Pool Size=25;");
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Configures MassTransit with RabbitMQ transport and EF Core outbox.
+    /// This ensures transactional delivery guarantees - both the OutboundDelivery
+    /// record and the message are committed atomically.
+    /// </summary>
+    private static IServiceCollection AddMassTransitForRouting(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddMassTransit(x =>
+        {
+            // Register the consumer
+            x.AddConsumer<DeliveryRequestedConsumer>();
+
+            // Configure RabbitMQ transport
+            x.UsingRabbitMq((context, cfg) =>
+            {
+                var rabbitMqSection = configuration.GetSection("RabbitMq");
+                var host = rabbitMqSection["Host"] ?? "localhost";
+                var virtualHost = rabbitMqSection["VirtualHost"] ?? "/";
+                var username = rabbitMqSection["Username"] ?? "guest";
+                var password = rabbitMqSection["Password"] ?? "guest";
+                var port = rabbitMqSection.GetValue<ushort?>("Port") ?? 5672;
+
+                cfg.Host(host, port, virtualHost, h =>
+                {
+                    h.Username(username);
+                    h.Password(password);
+                });
+
+                // Configure the delivery request queue
+                cfg.ReceiveEndpoint("notification-delivery-requests", e =>
+                {
+                    // Configure retry policy
+                    e.UseMessageRetry(r => r.Exponential(
+                        retryLimit: 3,
+                        minInterval: TimeSpan.FromSeconds(5),
+                        maxInterval: TimeSpan.FromMinutes(5),
+                        intervalDelta: TimeSpan.FromSeconds(10)));
+
+                    // Configure the consumer
+                    e.ConfigureConsumer<DeliveryRequestedConsumer>(context);
+
+                    // Prefetch for better throughput
+                    e.PrefetchCount = 16;
+                });
+
+                // Configure endpoints for all consumers
+                cfg.ConfigureEndpoints(context);
+            });
+
+            // Configure EF Core outbox for transactional publishing
+            x.AddEntityFrameworkOutbox<RoutingDbContext>(o =>
+            {
+                // Use PostgreSQL for the outbox
+                o.UsePostgres();
+
+                // Query delay for outbox message delivery
+                o.QueryDelay = TimeSpan.FromSeconds(1);
+
+                // Enable the bus outbox for automatic message staging
+                o.UseBusOutbox();
+            });
+        });
+
+        return services;
     }
 }

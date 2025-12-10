@@ -1,3 +1,4 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using NotificationService.Domain.Enums;
 using NotificationService.Routing.Domain.Enums;
@@ -432,5 +433,11 @@ public class RoutingDbContext : DbContext
                 .HasDatabaseName("idx_outbound_deliveries_contact")
                 .IsDescending(false, true);
         });
+
+        // Configure MassTransit outbox tables
+        // These tables are used for transactional outbox pattern
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
     }
 }

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using NotificationService.Domain.Enums;
 using NotificationService.Routing.Domain.Enums;
 using NotificationService.Routing.Domain.Models;
+using NotificationService.Routing.Messaging;
 using NotificationService.Routing.Repositories;
 
 namespace NotificationService.Routing.Services;
@@ -15,17 +16,20 @@ public class OutboundRouter : IOutboundRouter
     private readonly IRoutingPolicyRepository _policyRepository;
     private readonly IOutboundEventRepository _eventRepository;
     private readonly IOutboundDeliveryRepository _deliveryRepository;
+    private readonly IDeliveryMessagePublisher _messagePublisher;
     private readonly ILogger<OutboundRouter> _logger;
 
     public OutboundRouter(
         IRoutingPolicyRepository policyRepository,
         IOutboundEventRepository eventRepository,
         IOutboundDeliveryRepository deliveryRepository,
+        IDeliveryMessagePublisher messagePublisher,
         ILogger<OutboundRouter> logger)
     {
         _policyRepository = policyRepository;
         _eventRepository = eventRepository;
         _deliveryRepository = deliveryRepository;
+        _messagePublisher = messagePublisher;
         _logger = logger;
     }
 
@@ -91,10 +95,16 @@ public class OutboundRouter : IOutboundRouter
 
         if (deliveries.Count > 0)
         {
-            await _deliveryRepository.CreateManyAsync(deliveries);
+            // Create the delivery records in the database
+            var createdDeliveries = await _deliveryRepository.CreateManyAsync(deliveries);
             _logger.LogInformation(
                 "Created {DeliveryCount} deliveries for event {EventId}",
-                deliveries.Count, createdEvent.Id);
+                createdDeliveries.Count, createdEvent.Id);
+
+            // Publish messages to trigger delivery processing via MassTransit.
+            // The EF Core outbox ensures these messages are committed atomically
+            // with the delivery records.
+            await _messagePublisher.PublishDeliveryRequestsAsync(createdDeliveries, createdEvent);
         }
         else
         {
