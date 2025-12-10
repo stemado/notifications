@@ -16,6 +16,7 @@ public class RoutingController : ControllerBase
     private readonly IRecipientGroupService _groupService;
     private readonly IRoutingPolicyService _policyService;
     private readonly IContactService _contactService;
+    private readonly IRoutingDashboardService _dashboardService;
     private readonly ILogger<RoutingController> _logger;
 
     public RoutingController(
@@ -23,13 +24,25 @@ public class RoutingController : ControllerBase
         IRecipientGroupService groupService,
         IRoutingPolicyService policyService,
         IContactService contactService,
+        IRoutingDashboardService dashboardService,
         ILogger<RoutingController> logger)
     {
         _router = router;
         _groupService = groupService;
         _policyService = policyService;
         _contactService = contactService;
+        _dashboardService = dashboardService;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Get the routing dashboard with statistics, recent events, and failed deliveries
+    /// </summary>
+    [HttpGet("dashboard")]
+    public async Task<ActionResult<RoutingDashboardData>> GetDashboard()
+    {
+        var dashboardData = await _dashboardService.GetDashboardDataAsync();
+        return Ok(dashboardData);
     }
 
     /// <summary>

@@ -62,6 +62,7 @@ public static class RoutingServiceCollectionExtensions
         services.AddScoped<IRecipientGroupService, RecipientGroupService>();
         services.AddScoped<IRoutingPolicyService, RoutingPolicyService>();
         services.AddScoped<IOutboundRouter, OutboundRouter>();
+        services.AddScoped<IRoutingDashboardService, RoutingDashboardService>();
 
         return services;
     }
