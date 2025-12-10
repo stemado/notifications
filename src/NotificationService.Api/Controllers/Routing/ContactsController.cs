@@ -25,15 +25,17 @@ public class ContactsController : ControllerBase
     /// List all contacts, optionally filtering by search term
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<List<ContactSummary>>> ListContacts(
+    public async Task<ActionResult<PaginatedResponse<ContactSummary>>> ListContacts(
         [FromQuery] string? search = null,
-        [FromQuery] bool includeInactive = false)
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         var contacts = string.IsNullOrWhiteSpace(search)
             ? await _contactService.GetAllAsync(includeInactive)
             : await _contactService.SearchAsync(search, includeInactive);
 
-        var summaries = contacts.Select(c => new ContactSummary
+        var allSummaries = contacts.Select(c => new ContactSummary
         {
             Id = c.Id,
             Name = c.Name,
@@ -45,7 +47,23 @@ public class ContactsController : ControllerBase
             GroupCount = c.Memberships?.Count ?? 0
         }).ToList();
 
-        return Ok(summaries);
+        var totalItems = allSummaries.Count;
+        var totalPages = (int)Math.Ceiling((double)totalItems / pageSize);
+        var paginatedData = allSummaries
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return Ok(new PaginatedResponse<ContactSummary>
+        {
+            Data = paginatedData,
+            Page = page,
+            PageSize = pageSize,
+            TotalItems = totalItems,
+            TotalPages = totalPages,
+            HasNext = page < totalPages,
+            HasPrevious = page > 1
+        });
     }
 
     /// <summary>

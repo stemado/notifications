@@ -26,9 +26,11 @@ public class GroupsController : ControllerBase
     /// List all recipient groups, optionally filtering by client
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<List<RecipientGroupSummary>>> ListGroups(
+    public async Task<ActionResult<PaginatedResponse<RecipientGroupSummary>>> ListGroups(
         [FromQuery] string? clientId = null,
-        [FromQuery] bool includeInactive = false)
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         List<RecipientGroup> groups;
 
@@ -48,7 +50,7 @@ public class GroupsController : ControllerBase
             policies[group.Id] = groupPolicies.Count;
         }
 
-        var summaries = groups.Select(g => new RecipientGroupSummary
+        var allSummaries = groups.Select(g => new RecipientGroupSummary
         {
             Id = g.Id,
             Name = g.Name,
@@ -59,7 +61,23 @@ public class GroupsController : ControllerBase
             PolicyCount = policies.GetValueOrDefault(g.Id, 0)
         }).ToList();
 
-        return Ok(summaries);
+        var totalItems = allSummaries.Count;
+        var totalPages = (int)Math.Ceiling((double)totalItems / pageSize);
+        var paginatedData = allSummaries
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return Ok(new PaginatedResponse<RecipientGroupSummary>
+        {
+            Data = paginatedData,
+            Page = page,
+            PageSize = pageSize,
+            TotalItems = totalItems,
+            TotalPages = totalPages,
+            HasNext = page < totalPages,
+            HasPrevious = page > 1
+        });
     }
 
     /// <summary>

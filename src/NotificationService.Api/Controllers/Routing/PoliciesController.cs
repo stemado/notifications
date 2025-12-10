@@ -32,11 +32,13 @@ public class PoliciesController : ControllerBase
     /// List all routing policies, optionally filtering by client, service, or topic
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<List<RoutingPolicySummary>>> ListPolicies(
+    public async Task<ActionResult<PaginatedResponse<RoutingPolicySummary>>> ListPolicies(
         [FromQuery] string? clientId = null,
         [FromQuery] SourceService? service = null,
         [FromQuery] NotificationTopic? topic = null,
-        [FromQuery] bool includeDisabled = false)
+        [FromQuery] bool includeDisabled = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         List<RoutingPolicy> policies;
 
@@ -53,7 +55,7 @@ public class PoliciesController : ControllerBase
             policies = await _policyService.GetAllAsync(includeDisabled);
         }
 
-        var summaries = policies.Select(p => new RoutingPolicySummary
+        var allSummaries = policies.Select(p => new RoutingPolicySummary
         {
             Id = p.Id,
             Service = p.Service.ToString(),
@@ -68,7 +70,23 @@ public class PoliciesController : ControllerBase
             IsEnabled = p.IsEnabled
         }).ToList();
 
-        return Ok(summaries);
+        var totalItems = allSummaries.Count;
+        var totalPages = (int)Math.Ceiling((double)totalItems / pageSize);
+        var paginatedData = allSummaries
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return Ok(new PaginatedResponse<RoutingPolicySummary>
+        {
+            Data = paginatedData,
+            Page = page,
+            PageSize = pageSize,
+            TotalItems = totalItems,
+            TotalPages = totalPages,
+            HasNext = page < totalPages,
+            HasPrevious = page > 1
+        });
     }
 
     /// <summary>
