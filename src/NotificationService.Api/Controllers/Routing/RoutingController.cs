@@ -73,30 +73,8 @@ public class RoutingController : ControllerBase
         return Ok(MapToEventSummary(createdEvent!));
     }
 
-    /// <summary>
-    /// Get an outbound event by ID
-    /// </summary>
-    [HttpGet("events/{id:guid}")]
-    public async Task<ActionResult<OutboundEventDetails>> GetEvent(Guid id)
-    {
-        var evt = await _router.GetEventAsync(id);
-        if (evt == null)
-        {
-            return NotFound($"Event {id} not found");
-        }
-
-        return Ok(MapToEventDetails(evt));
-    }
-
-    /// <summary>
-    /// Get events for a specific saga
-    /// </summary>
-    [HttpGet("events/saga/{sagaId:guid}")]
-    public async Task<ActionResult<List<OutboundEventSummary>>> GetEventsBySaga(Guid sagaId)
-    {
-        var events = await _router.GetEventsBySagaAsync(sagaId);
-        return Ok(events.Select(MapToEventSummary).ToList());
-    }
+    // NOTE: GetEvent and GetEventsBySaga routes removed from RoutingController
+    // to avoid conflicts with EventsController which handles these endpoints.
 
     /// <summary>
     /// Get the complete routing configuration for a client
