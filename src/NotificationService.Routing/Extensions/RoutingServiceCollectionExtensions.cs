@@ -120,57 +120,33 @@ public static class RoutingServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Configures MassTransit with RabbitMQ transport and EF Core outbox.
-    /// This ensures transactional delivery guarantees - both the OutboundDelivery
-    /// record and the message are committed atomically.
+    /// Configures MassTransit with configurable transport (InMemory or RabbitMQ) and EF Core outbox.
+    /// Transport is selected via "Messaging:Transport" config setting.
+    /// The outbox provides transactional delivery guarantees regardless of transport.
     /// </summary>
     private static IServiceCollection AddMassTransitForRouting(
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        var transport = configuration.GetValue<string>("Messaging:Transport") ?? "InMemory";
+
         services.AddMassTransit(x =>
         {
             // Register the consumer
             x.AddConsumer<DeliveryRequestedConsumer>();
 
-            // Configure RabbitMQ transport
-            x.UsingRabbitMq((context, cfg) =>
+            // Configure transport based on settings
+            if (transport.Equals("RabbitMQ", StringComparison.OrdinalIgnoreCase))
             {
-                var rabbitMqSection = configuration.GetSection("RabbitMq");
-                var host = rabbitMqSection["Host"] ?? "localhost";
-                var virtualHost = rabbitMqSection["VirtualHost"] ?? "/";
-                var username = rabbitMqSection["Username"] ?? "guest";
-                var password = rabbitMqSection["Password"] ?? "guest";
-                var port = rabbitMqSection.GetValue<ushort?>("Port") ?? 5672;
-
-                cfg.Host(host, port, virtualHost, h =>
-                {
-                    h.Username(username);
-                    h.Password(password);
-                });
-
-                // Configure the delivery request queue
-                cfg.ReceiveEndpoint("notification-delivery-requests", e =>
-                {
-                    // Configure retry policy
-                    e.UseMessageRetry(r => r.Exponential(
-                        retryLimit: 3,
-                        minInterval: TimeSpan.FromSeconds(5),
-                        maxInterval: TimeSpan.FromMinutes(5),
-                        intervalDelta: TimeSpan.FromSeconds(10)));
-
-                    // Configure the consumer
-                    e.ConfigureConsumer<DeliveryRequestedConsumer>(context);
-
-                    // Prefetch for better throughput
-                    e.PrefetchCount = 16;
-                });
-
-                // Configure endpoints for all consumers
-                cfg.ConfigureEndpoints(context);
-            });
+                ConfigureRabbitMqTransport(x, configuration);
+            }
+            else
+            {
+                ConfigureInMemoryTransport(x);
+            }
 
             // Configure EF Core outbox for transactional publishing
+            // This works with both InMemory and RabbitMQ transports
             x.AddEntityFrameworkOutbox<RoutingDbContext>(o =>
             {
                 // Use PostgreSQL for the outbox
@@ -185,5 +161,77 @@ public static class RoutingServiceCollectionExtensions
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Configures InMemory transport for local development/testing.
+    /// Messages are processed in-process without external dependencies.
+    /// </summary>
+    private static void ConfigureInMemoryTransport(IBusRegistrationConfigurator x)
+    {
+        x.UsingInMemory((context, cfg) =>
+        {
+            // Configure the delivery request queue
+            cfg.ReceiveEndpoint("notification-delivery-requests", e =>
+            {
+                // Configure retry policy
+                e.UseMessageRetry(r => r.Exponential(
+                    retryLimit: 3,
+                    minInterval: TimeSpan.FromSeconds(5),
+                    maxInterval: TimeSpan.FromMinutes(5),
+                    intervalDelta: TimeSpan.FromSeconds(10)));
+
+                // Configure the consumer
+                e.ConfigureConsumer<DeliveryRequestedConsumer>(context);
+            });
+
+            // Configure endpoints for all consumers
+            cfg.ConfigureEndpoints(context);
+        });
+    }
+
+    /// <summary>
+    /// Configures RabbitMQ transport for production use.
+    /// Requires RabbitMQ server to be running.
+    /// </summary>
+    private static void ConfigureRabbitMqTransport(
+        IBusRegistrationConfigurator x,
+        IConfiguration configuration)
+    {
+        x.UsingRabbitMq((context, cfg) =>
+        {
+            var rabbitMqSection = configuration.GetSection("RabbitMq");
+            var host = rabbitMqSection["Host"] ?? "localhost";
+            var virtualHost = rabbitMqSection["VirtualHost"] ?? "/";
+            var username = rabbitMqSection["Username"] ?? "guest";
+            var password = rabbitMqSection["Password"] ?? "guest";
+            var port = rabbitMqSection.GetValue<ushort?>("Port") ?? 5672;
+
+            cfg.Host(host, port, virtualHost, h =>
+            {
+                h.Username(username);
+                h.Password(password);
+            });
+
+            // Configure the delivery request queue
+            cfg.ReceiveEndpoint("notification-delivery-requests", e =>
+            {
+                // Configure retry policy
+                e.UseMessageRetry(r => r.Exponential(
+                    retryLimit: 3,
+                    minInterval: TimeSpan.FromSeconds(5),
+                    maxInterval: TimeSpan.FromMinutes(5),
+                    intervalDelta: TimeSpan.FromSeconds(10)));
+
+                // Configure the consumer
+                e.ConfigureConsumer<DeliveryRequestedConsumer>(context);
+
+                // Prefetch for better throughput
+                e.PrefetchCount = 16;
+            });
+
+            // Configure endpoints for all consumers
+            cfg.ConfigureEndpoints(context);
+        });
     }
 }
