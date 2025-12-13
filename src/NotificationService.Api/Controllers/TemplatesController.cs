@@ -136,6 +136,50 @@ public class TemplatesController : ControllerBase
         return Ok(response);
     }
 
+    /// <summary>
+    /// GET /api/templates/type/{type} - Get a template by template type (e.g., workflow_triggered, file_detected)
+    /// </summary>
+    /// <remarks>
+    /// Returns the first active template matching the specified type.
+    /// Template types are used to categorize templates by their purpose (workflow_triggered, file_detected, etc.)
+    /// </remarks>
+    [HttpGet("type/{type}")]
+    [ProducesResponseType(typeof(EmailTemplateDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetTemplateByType(string type, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(type))
+            return BadRequest(new { message = "Template type is required" });
+
+        var template = await _templateRepository.GetByTypeAsync(type, ct);
+        if (template == null)
+        {
+            _logger.LogWarning("No active template found for type: {TemplateType}", type);
+            return NotFound(new { message = $"No active template found for type '{type}'" });
+        }
+
+        var response = MapToDetailDto(template);
+        _logger.LogInformation("Retrieved template by type: {TemplateType}, Name: {TemplateName}", type, template.Name);
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// GET /api/templates/type/{type}/all - Get all templates of a specific type
+    /// </summary>
+    [HttpGet("type/{type}/all")]
+    [ProducesResponseType(typeof(IEnumerable<EmailTemplateListDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllTemplatesByType(string type, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(type))
+            return BadRequest(new { message = "Template type is required" });
+
+        var templates = await _templateRepository.GetAllByTypeAsync(type, ct);
+        var response = templates.Select(MapToListDto);
+
+        _logger.LogInformation("Retrieved {Count} templates for type: {TemplateType}", templates.Count, type);
+        return Ok(response);
+    }
+
     // ==================== Template CRUD Endpoints ====================
 
     /// <summary>

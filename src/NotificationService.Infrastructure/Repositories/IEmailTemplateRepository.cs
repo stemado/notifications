@@ -28,6 +28,16 @@ public interface IEmailTemplateRepository
     Task<EmailTemplate?> GetByNameAsync(string name, CancellationToken ct = default);
 
     /// <summary>
+    /// Get the first active template by template type (e.g., "workflow_triggered", "file_detected")
+    /// </summary>
+    Task<EmailTemplate?> GetByTypeAsync(string templateType, CancellationToken ct = default);
+
+    /// <summary>
+    /// Get all templates of a specific type
+    /// </summary>
+    Task<List<EmailTemplate>> GetAllByTypeAsync(string templateType, CancellationToken ct = default);
+
+    /// <summary>
     /// Create a new template
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown when a template with the same name already exists</exception>

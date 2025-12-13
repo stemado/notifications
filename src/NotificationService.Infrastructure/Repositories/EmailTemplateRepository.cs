@@ -46,6 +46,28 @@ public class EmailTemplateRepository : IEmailTemplateRepository
             .FirstOrDefaultAsync(t => t.Name == name, ct);
     }
 
+    public async Task<EmailTemplate?> GetByTypeAsync(string templateType, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(templateType))
+            throw new ArgumentException("Template type cannot be empty", nameof(templateType));
+
+        return await _context.EmailTemplates
+            .Where(t => t.TemplateType == templateType && t.IsActive)
+            .OrderBy(t => t.Name)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<List<EmailTemplate>> GetAllByTypeAsync(string templateType, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(templateType))
+            throw new ArgumentException("Template type cannot be empty", nameof(templateType));
+
+        return await _context.EmailTemplates
+            .Where(t => t.TemplateType == templateType)
+            .OrderBy(t => t.Name)
+            .ToListAsync(ct);
+    }
+
     public async Task<EmailTemplate> CreateAsync(EmailTemplate template, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(template);
