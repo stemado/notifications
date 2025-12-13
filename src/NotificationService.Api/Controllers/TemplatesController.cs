@@ -167,17 +167,26 @@ public class TemplatesController : ControllerBase
     /// GET /api/templates/type/{type}/all - Get all templates of a specific type
     /// </summary>
     [HttpGet("type/{type}/all")]
-    [ProducesResponseType(typeof(IEnumerable<EmailTemplateListDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(TemplateListResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllTemplatesByType(string type, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(type))
             return BadRequest(new { message = "Template type is required" });
 
         var templates = await _templateRepository.GetAllByTypeAsync(type, ct);
-        var response = templates.Select(MapToListDto);
+        var response = templates.Select(t => new EmailTemplateDto(
+            Id: t.Id,
+            Name: t.Name,
+            Description: t.Description,
+            Subject: t.Subject,
+            TemplateType: t.TemplateType,
+            IsActive: t.IsActive,
+            CreatedAt: t.CreatedAt,
+            UpdatedAt: t.UpdatedAt
+        )).ToList();
 
         _logger.LogInformation("Retrieved {Count} templates for type: {TemplateType}", templates.Count, type);
-        return Ok(response);
+        return Ok(new TemplateListResponse(response.Count, response));
     }
 
     // ==================== Template CRUD Endpoints ====================
