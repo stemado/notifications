@@ -117,6 +117,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEventHandler<ImportFailedEvent>, ImportFailedNotificationHandler>();
         services.AddScoped<IEventHandler<EscalationCreatedEvent>, EscalationCreatedNotificationHandler>();
         services.AddScoped<IEventHandler<FileProcessingErrorEvent>, FileProcessingErrorNotificationHandler>();
+        services.AddScoped<IEventHandler<FilePickedUpEvent>, FilePickedUpNotificationHandler>();
 
         // Event handlers (Phase 6 - Supervisor Pattern Integration)
         services.AddScoped<IEventHandler<ApiSLABreachEvent>, SLABreachNotificationHandler>();

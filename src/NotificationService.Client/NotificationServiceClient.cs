@@ -463,6 +463,67 @@ public class NotificationServiceClient : INotificationServiceClient
         return await CreateOrUpdateNotificationAsync(request, cancellationToken);
     }
 
+    public async Task<NotificationResponse> PublishFilePickedUpEventAsync(
+        FilePickedUpEvent evt,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
+        _logger.LogInformation("Publishing FilePickedUpEvent: SagaId={SagaId}, ClientId={ClientId}, FileName={FileName}",
+            evt.SagaId, evt.ClientId, evt.FileName);
+
+        var request = new CreateNotificationRequest
+        {
+            UserId = SystemUserId,
+            TenantId = evt.TenantId,
+            Severity = NotificationSeverity.Info,
+            Title = $"File Picked Up: {evt.ClientName}",
+            Message = BuildFilePickedUpMessage(evt),
+            SagaId = evt.SagaId,
+            ClientId = ParseGuidOrDefault(evt.ClientId),
+            EventType = nameof(FilePickedUpEvent),
+            GroupKey = $"file:pickedup:{evt.SagaId}",
+            ExpiresAt = DateTime.UtcNow.AddHours(4), // Short-lived - superseded by completion
+            Metadata = new Dictionary<string, object>
+            {
+                ["clientId"] = evt.ClientId,
+                ["clientName"] = evt.ClientName,
+                ["fileName"] = evt.FileName,
+                ["filePath"] = evt.FilePath,
+                ["fileSizeBytes"] = evt.FileSizeBytes ?? 0,
+                ["pickedUpAt"] = evt.PickedUpAt.ToString("O"),
+                ["correlationId"] = evt.CorrelationId ?? string.Empty
+            },
+            Actions = new List<NotificationAction>
+            {
+                new() { Label = "View Workflow", Url = $"/timeline/{evt.SagaId}", ActionType = "link" }
+            }
+        };
+
+        return await CreateNotificationAsync(request, cancellationToken);
+    }
+
+    private static string BuildFilePickedUpMessage(FilePickedUpEvent evt)
+    {
+        var message = $"File '{evt.FileName}' detected and registered for processing.";
+
+        if (evt.FileSizeBytes.HasValue && evt.FileSizeBytes > 0)
+        {
+            message += $" Size: {FormatFileSize(evt.FileSizeBytes.Value)}";
+        }
+
+        return message;
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes >= 1_048_576)
+            return $"{bytes / 1_048_576.0:F1} MB";
+        if (bytes >= 1024)
+            return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes} bytes";
+    }
+
     #endregion
 
     #region Health Check

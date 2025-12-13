@@ -28,6 +28,7 @@ public class EventsController : ControllerBase
     private readonly IEventHandler<ImportFailedEvent> _importFailedHandler;
     private readonly IEventHandler<EscalationCreatedEvent> _escalationCreatedHandler;
     private readonly IEventHandler<FileProcessingErrorEvent> _fileProcessingErrorHandler;
+    private readonly IEventHandler<FilePickedUpEvent> _filePickedUpHandler;
     private readonly IEventHandler<ApiSLABreachEvent> _slaBreachHandler;
     private readonly IEventHandler<ApiPlanSourceOperationFailedEvent> _planSourceFailedHandler;
     private readonly IEventHandler<ApiAggregateGenerationStalledEvent> _aggregateStalledHandler;
@@ -39,6 +40,7 @@ public class EventsController : ControllerBase
         IEventHandler<ImportFailedEvent> importFailedHandler,
         IEventHandler<EscalationCreatedEvent> escalationCreatedHandler,
         IEventHandler<FileProcessingErrorEvent> fileProcessingErrorHandler,
+        IEventHandler<FilePickedUpEvent> filePickedUpHandler,
         IEventHandler<ApiSLABreachEvent> slaBreachHandler,
         IEventHandler<ApiPlanSourceOperationFailedEvent> planSourceFailedHandler,
         IEventHandler<ApiAggregateGenerationStalledEvent> aggregateStalledHandler,
@@ -49,6 +51,7 @@ public class EventsController : ControllerBase
         _importFailedHandler = importFailedHandler;
         _escalationCreatedHandler = escalationCreatedHandler;
         _fileProcessingErrorHandler = fileProcessingErrorHandler;
+        _filePickedUpHandler = filePickedUpHandler;
         _slaBreachHandler = slaBreachHandler;
         _planSourceFailedHandler = planSourceFailedHandler;
         _aggregateStalledHandler = aggregateStalledHandler;
@@ -168,6 +171,32 @@ public class EventsController : ControllerBase
         await _fileProcessingErrorHandler.Handle(evt);
 
         return Accepted(new { message = "Event processed", clientId = evt.ClientId, errorType = evt.ErrorType });
+    }
+
+    /// <summary>
+    /// Process a file picked up event
+    /// </summary>
+    [HttpPost("file-picked-up")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> HandleFilePickedUp([FromBody] FilePickedUpEvent evt)
+    {
+        if (evt.SagaId == Guid.Empty)
+        {
+            return BadRequest(new { error = "SagaId is required" });
+        }
+
+        if (string.IsNullOrEmpty(evt.ClientId))
+        {
+            return BadRequest(new { error = "ClientId is required" });
+        }
+
+        _logger.LogInformation("Received FilePickedUpEvent: SagaId={SagaId}, ClientId={ClientId}, FileName={FileName}",
+            evt.SagaId, evt.ClientId, evt.FileName);
+
+        await _filePickedUpHandler.Handle(evt);
+
+        return Accepted(new { message = "Event processed", sagaId = evt.SagaId });
     }
 
     /// <summary>

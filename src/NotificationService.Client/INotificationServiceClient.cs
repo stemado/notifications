@@ -149,6 +149,17 @@ public interface INotificationServiceClient
         AggregateGenerationStalledEvent evt,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Publishes a FilePickedUpEvent to create an appropriate notification.
+    /// </summary>
+    /// <param name="evt">The event details</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Response with notification ID</returns>
+    /// <exception cref="NotificationServiceException">Thrown when the request fails</exception>
+    Task<NotificationResponse> PublishFilePickedUpEventAsync(
+        FilePickedUpEvent evt,
+        CancellationToken cancellationToken = default);
+
     #endregion
 
     #region Health Check
