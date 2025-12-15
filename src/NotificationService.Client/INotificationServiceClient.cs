@@ -160,6 +160,19 @@ public interface INotificationServiceClient
         FilePickedUpEvent evt,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Publishes a TemplatesQueuedEvent to trigger the Import History Scheduler.
+    /// This is the event-driven fix for ensuring import history checks are scheduled
+    /// even when direct calls in client code fail.
+    /// </summary>
+    /// <param name="evt">The event details including client ID, template count, and delay minutes</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Response with notification ID</returns>
+    /// <exception cref="NotificationServiceException">Thrown when the request fails</exception>
+    Task<NotificationResponse> PublishTemplatesQueuedEventAsync(
+        TemplatesQueuedEvent evt,
+        CancellationToken cancellationToken = default);
+
     #endregion
 
     #region Health Check

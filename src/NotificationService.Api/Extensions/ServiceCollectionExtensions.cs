@@ -5,6 +5,7 @@ using NotificationService.Api.EventHandlers;
 using NotificationService.Api.Events;
 using NotificationService.Api.Jobs;
 using NotificationService.Client.Events;
+using Core.ImportHistoryScheduler.Extensions;
 
 // Aliases to avoid ambiguity between Api and Client event types
 using ApiSagaStuckEvent = NotificationService.Api.Events.SagaStuckEvent;
@@ -123,6 +124,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEventHandler<ApiSLABreachEvent>, SLABreachNotificationHandler>();
         services.AddScoped<IEventHandler<ApiPlanSourceOperationFailedEvent>, PlanSourceOperationFailedNotificationHandler>();
         services.AddScoped<IEventHandler<ApiAggregateGenerationStalledEvent>, AggregateGenerationStalledNotificationHandler>();
+
+        // Event handlers (Phase 7 - Import History Scheduler Integration)
+        // This handler triggers ScheduleCheckAsync when templates are queued
+        services.AddScoped<IEventHandler<TemplatesQueuedEvent>, TemplatesQueuedNotificationHandler>();
+
+        // Import History Scheduler - required for TemplatesQueuedNotificationHandler
+        // Uses MySQL database to persist scheduled checks
+        services.AddImportHistoryScheduler();
 
         // Background jobs (Phase 1)
         services.AddScoped<NotificationRepeatJob>();

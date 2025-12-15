@@ -32,6 +32,7 @@ public class EventsController : ControllerBase
     private readonly IEventHandler<ApiSLABreachEvent> _slaBreachHandler;
     private readonly IEventHandler<ApiPlanSourceOperationFailedEvent> _planSourceFailedHandler;
     private readonly IEventHandler<ApiAggregateGenerationStalledEvent> _aggregateStalledHandler;
+    private readonly IEventHandler<TemplatesQueuedEvent> _templatesQueuedHandler;
     private readonly ILogger<EventsController> _logger;
 
     public EventsController(
@@ -44,6 +45,7 @@ public class EventsController : ControllerBase
         IEventHandler<ApiSLABreachEvent> slaBreachHandler,
         IEventHandler<ApiPlanSourceOperationFailedEvent> planSourceFailedHandler,
         IEventHandler<ApiAggregateGenerationStalledEvent> aggregateStalledHandler,
+        IEventHandler<TemplatesQueuedEvent> templatesQueuedHandler,
         ILogger<EventsController> logger)
     {
         _sagaStuckHandler = sagaStuckHandler;
@@ -55,6 +57,7 @@ public class EventsController : ControllerBase
         _slaBreachHandler = slaBreachHandler;
         _planSourceFailedHandler = planSourceFailedHandler;
         _aggregateStalledHandler = aggregateStalledHandler;
+        _templatesQueuedHandler = templatesQueuedHandler;
         _logger = logger;
     }
 
@@ -308,6 +311,35 @@ public class EventsController : ControllerBase
         await _aggregateStalledHandler.Handle(apiEvent);
 
         return Accepted(new { message = "Event processed", sagaId = evt.SagaId });
+    }
+
+    /// <summary>
+    /// Process a templates queued event - triggers Import History Scheduler
+    /// </summary>
+    [HttpPost("templates-queued")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> HandleTemplatesQueued([FromBody] TemplatesQueuedEvent evt)
+    {
+        if (string.IsNullOrEmpty(evt.ClientId))
+        {
+            return BadRequest(new { error = "ClientId is required" });
+        }
+
+        _logger.LogInformation(
+            "Received TemplatesQueuedEvent: SagaId={SagaId}, ClientId={ClientId}, TemplateCount={TemplateCount}, ImportTypes=[{ImportTypes}]",
+            evt.SagaId, evt.ClientId, evt.TemplateCount, string.Join(", ", evt.ImportTypes));
+
+        await _templatesQueuedHandler.Handle(evt);
+
+        return Accepted(new
+        {
+            message = "Event processed - Import history check scheduled",
+            sagaId = evt.SagaId,
+            clientId = evt.ClientId,
+            templateCount = evt.TemplateCount,
+            delayMinutes = evt.DelayMinutes
+        });
     }
 
     private static Domain.Enums.NotificationSeverity MapSeverity(Client.Models.NotificationSeverity severity)

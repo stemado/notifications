@@ -26,6 +26,7 @@
     <ProjectReference Include="..\NotificationService.Infrastructure\NotificationService.Infrastructure.csproj" />
     <ProjectReference Include="..\NotificationService.Client\NotificationService.Client.csproj" />
     <ProjectReference Include="..\NotificationService.Routing\NotificationService.Routing.csproj" />
+    <ProjectReference Include="..\..\..\Core.ImportHistoryScheduler\Core.ImportHistoryScheduler.csproj" />
   </ItemGroup>
 
 </Project>

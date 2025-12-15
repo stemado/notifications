@@ -503,6 +503,43 @@ public class NotificationServiceClient : INotificationServiceClient
         return await CreateNotificationAsync(request, cancellationToken);
     }
 
+    public async Task<NotificationResponse> PublishTemplatesQueuedEventAsync(
+        TemplatesQueuedEvent evt,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
+        _logger.LogInformation(
+            "Publishing TemplatesQueuedEvent: SagaId={SagaId}, ClientId={ClientId}, TemplateCount={TemplateCount}, DelayMinutes={DelayMinutes}",
+            evt.SagaId, evt.ClientId, evt.TemplateCount, evt.DelayMinutes);
+
+        // Post directly to the event endpoint - this triggers ScheduleCheckAsync
+        var response = await _httpClient.PostAsJsonAsync(
+            "api/events/templates-queued",
+            evt,
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogError(
+                "Failed to publish TemplatesQueuedEvent: {StatusCode} {Error}",
+                response.StatusCode, error);
+            throw new NotificationServiceException(
+                $"Failed to publish TemplatesQueuedEvent: {response.StatusCode} - {error}");
+        }
+
+        _logger.LogInformation(
+            "Successfully published TemplatesQueuedEvent for client {ClientId}, import history check will be scheduled",
+            evt.ClientId);
+
+        return new NotificationResponse
+        {
+            Success = true,
+            NotificationId = Guid.NewGuid() // The actual ID is managed by the handler
+        };
+    }
+
     private static string BuildFilePickedUpMessage(FilePickedUpEvent evt)
     {
         var message = $"File '{evt.FileName}' detected and registered for processing.";
