@@ -1,3 +1,5 @@
+using NotificationService.Routing.Domain.Enums;
+
 namespace NotificationService.Routing.Domain.Models;
 
 /// <summary>
@@ -22,6 +24,16 @@ public class RecipientGroup
     /// Description of the group's purpose
     /// </summary>
     public string? Description { get; set; }
+
+    /// <summary>
+    /// Purpose of the group - determines if it can be used for test emails, production, or both
+    /// </summary>
+    public GroupPurpose Purpose { get; set; } = GroupPurpose.Production;
+
+    /// <summary>
+    /// Tags for filtering and categorization (e.g., "client-testing", "internal", "qa")
+    /// </summary>
+    public List<string> Tags { get; set; } = new();
 
     /// <summary>
     /// Whether the group is active

@@ -23,6 +23,7 @@ public class RoutingDbContext : DbContext
     public DbSet<RoutingPolicy> RoutingPolicies => Set<RoutingPolicy>();
     public DbSet<OutboundEvent> OutboundEvents => Set<OutboundEvent>();
     public DbSet<OutboundDelivery> OutboundDeliveries => Set<OutboundDelivery>();
+    public DbSet<TestEmailDelivery> TestEmailDeliveries => Set<TestEmailDelivery>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -115,6 +116,21 @@ public class RoutingDbContext : DbContext
                 .HasMaxLength(500)
                 .HasColumnName("description");
 
+            entity.Property(e => e.Purpose)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'Production'")
+                .HasColumnName("purpose");
+
+            entity.Property(e => e.Tags)
+                .HasColumnName("tags")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>()
+                );
+
             entity.Property(e => e.IsActive)
                 .HasDefaultValue(true)
                 .HasColumnName("is_active");
@@ -137,6 +153,9 @@ public class RoutingDbContext : DbContext
             entity.HasIndex(e => e.ClientId)
                 .HasDatabaseName("idx_recipient_groups_client")
                 .HasFilter("client_id IS NOT NULL");
+
+            entity.HasIndex(e => e.Purpose)
+                .HasDatabaseName("idx_recipient_groups_purpose");
         });
 
         // Configure GroupMembership entity (junction table)
@@ -432,6 +451,94 @@ public class RoutingDbContext : DbContext
             entity.HasIndex(e => new { e.ContactId, e.CreatedAt })
                 .HasDatabaseName("idx_outbound_deliveries_contact")
                 .IsDescending(false, true);
+        });
+
+        // Configure TestEmailDelivery entity
+        modelBuilder.Entity<TestEmailDelivery>(entity =>
+        {
+            entity.ToTable("test_email_deliveries");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("gen_random_uuid()")
+                .HasColumnName("id");
+
+            entity.Property(e => e.RecipientGroupId)
+                .HasColumnName("recipient_group_id");
+
+            entity.Property(e => e.TemplateName)
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnName("template_name");
+
+            entity.Property(e => e.Subject)
+                .IsRequired()
+                .HasMaxLength(500)
+                .HasColumnName("subject");
+
+            entity.Property(e => e.Recipients)
+                .IsRequired()
+                .HasColumnName("recipients")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>()
+                );
+
+            entity.Property(e => e.TestReason)
+                .HasMaxLength(500)
+                .HasColumnName("test_reason");
+
+            entity.Property(e => e.InitiatedBy)
+                .IsRequired()
+                .HasMaxLength(200)
+                .HasColumnName("initiated_by");
+
+            entity.Property(e => e.SentAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("sent_at");
+
+            entity.Property(e => e.Success)
+                .IsRequired()
+                .HasDefaultValue(false)
+                .HasColumnName("success");
+
+            entity.Property(e => e.ErrorMessage)
+                .HasColumnName("error_message");
+
+            entity.Property(e => e.MessageId)
+                .HasMaxLength(200)
+                .HasColumnName("message_id");
+
+            entity.Property(e => e.Provider)
+                .HasMaxLength(50)
+                .HasColumnName("provider");
+
+            entity.Property(e => e.Metadata)
+                .HasColumnName("metadata")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(v, (JsonSerializerOptions?)null) ?? new Dictionary<string, JsonElement>()
+                );
+
+            // Relationships
+            entity.HasOne(e => e.RecipientGroup)
+                .WithMany()
+                .HasForeignKey(e => e.RecipientGroupId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Indexes
+            entity.HasIndex(e => e.RecipientGroupId)
+                .HasDatabaseName("idx_test_email_deliveries_group");
+
+            entity.HasIndex(e => e.SentAt)
+                .HasDatabaseName("idx_test_email_deliveries_sent")
+                .IsDescending();
+
+            entity.HasIndex(e => e.InitiatedBy)
+                .HasDatabaseName("idx_test_email_deliveries_initiated_by");
         });
 
         // Configure MassTransit outbox tables

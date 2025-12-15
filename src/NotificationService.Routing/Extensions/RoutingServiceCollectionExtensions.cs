@@ -60,6 +60,7 @@ public static class RoutingServiceCollectionExtensions
         services.AddScoped<IRoutingPolicyRepository, RoutingPolicyRepository>();
         services.AddScoped<IOutboundEventRepository, OutboundEventRepository>();
         services.AddScoped<IOutboundDeliveryRepository, OutboundDeliveryRepository>();
+        services.AddScoped<ITestEmailDeliveryRepository, TestEmailDeliveryRepository>();
 
         // Services
         services.AddScoped<IContactService, ContactService>();

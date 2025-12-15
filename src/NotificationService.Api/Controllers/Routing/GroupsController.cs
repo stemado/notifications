@@ -56,6 +56,8 @@ public class GroupsController : ControllerBase
             Name = g.Name,
             ClientId = g.ClientId,
             Description = g.Description,
+            Purpose = g.Purpose,
+            Tags = g.Tags,
             IsActive = g.IsActive,
             MemberCount = g.Memberships?.Count ?? 0,
             PolicyCount = policies.GetValueOrDefault(g.Id, 0)
@@ -100,6 +102,8 @@ public class GroupsController : ControllerBase
             Name = group.Name,
             ClientId = group.ClientId,
             Description = group.Description,
+            Purpose = group.Purpose,
+            Tags = group.Tags,
             IsActive = group.IsActive,
             CreatedAt = group.CreatedAt,
             UpdatedAt = group.UpdatedAt,
@@ -137,7 +141,9 @@ public class GroupsController : ControllerBase
         {
             Name = request.Name,
             ClientId = request.ClientId,
-            Description = request.Description
+            Description = request.Description,
+            Purpose = request.Purpose,
+            Tags = request.Tags ?? new List<string>()
         };
 
         var created = await _groupService.CreateAsync(group);
@@ -149,6 +155,8 @@ public class GroupsController : ControllerBase
             Name = created.Name,
             ClientId = created.ClientId,
             Description = created.Description,
+            Purpose = created.Purpose,
+            Tags = created.Tags,
             IsActive = created.IsActive,
             CreatedAt = created.CreatedAt,
             UpdatedAt = created.UpdatedAt,
@@ -172,6 +180,10 @@ public class GroupsController : ControllerBase
         group.Name = request.Name;
         group.Description = request.Description;
         group.IsActive = request.IsActive;
+        if (request.Purpose.HasValue)
+            group.Purpose = request.Purpose.Value;
+        if (request.Tags != null)
+            group.Tags = request.Tags;
 
         var updated = await _groupService.UpdateAsync(group);
         var policies = await _groupService.GetPoliciesUsingGroupAsync(id);
@@ -182,6 +194,8 @@ public class GroupsController : ControllerBase
             Name = updated.Name,
             ClientId = updated.ClientId,
             Description = updated.Description,
+            Purpose = updated.Purpose,
+            Tags = updated.Tags,
             IsActive = updated.IsActive,
             CreatedAt = updated.CreatedAt,
             UpdatedAt = updated.UpdatedAt,

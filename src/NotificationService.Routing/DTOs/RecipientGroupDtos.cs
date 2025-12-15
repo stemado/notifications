@@ -1,3 +1,5 @@
+using NotificationService.Routing.Domain.Enums;
+
 namespace NotificationService.Routing.DTOs;
 
 /// <summary>
@@ -8,6 +10,8 @@ public record CreateRecipientGroupRequest
     public required string Name { get; init; }
     public string? ClientId { get; init; }
     public string? Description { get; init; }
+    public GroupPurpose Purpose { get; init; } = GroupPurpose.Production;
+    public List<string>? Tags { get; init; }
 }
 
 /// <summary>
@@ -18,6 +22,8 @@ public record UpdateRecipientGroupRequest
     public required string Name { get; init; }
     public string? Description { get; init; }
     public bool IsActive { get; init; }
+    public GroupPurpose? Purpose { get; init; }
+    public List<string>? Tags { get; init; }
 }
 
 /// <summary>
@@ -37,6 +43,8 @@ public record RecipientGroupSummary
     public required string Name { get; init; }
     public string? ClientId { get; init; }
     public string? Description { get; init; }
+    public GroupPurpose Purpose { get; init; }
+    public List<string> Tags { get; init; } = new();
     public bool IsActive { get; init; }
     public int MemberCount { get; init; }
     public int PolicyCount { get; init; }
@@ -51,6 +59,8 @@ public record RecipientGroupDetails
     public required string Name { get; init; }
     public string? ClientId { get; init; }
     public string? Description { get; init; }
+    public GroupPurpose Purpose { get; init; }
+    public List<string> Tags { get; init; } = new();
     public bool IsActive { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
