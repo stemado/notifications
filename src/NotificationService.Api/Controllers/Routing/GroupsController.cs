@@ -177,9 +177,13 @@ public class GroupsController : ControllerBase
             return NotFound($"Recipient group {id} not found");
         }
 
-        group.Name = request.Name;
-        group.Description = request.Description;
-        group.IsActive = request.IsActive;
+        // Only update fields that are provided
+        if (!string.IsNullOrEmpty(request.Name))
+            group.Name = request.Name;
+        if (request.Description != null)
+            group.Description = request.Description;
+        if (request.IsActive.HasValue)
+            group.IsActive = request.IsActive.Value;
         if (request.Purpose.HasValue)
             group.Purpose = request.Purpose.Value;
         if (request.Tags != null)

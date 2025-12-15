@@ -19,9 +19,12 @@ public record CreateRecipientGroupRequest
 /// </summary>
 public record UpdateRecipientGroupRequest
 {
-    public required string Name { get; init; }
+    public string? Name { get; init; }
     public string? Description { get; init; }
-    public bool IsActive { get; init; }
+    /// <summary>
+    /// If null, IsActive is not changed. If true/false, updates the active status.
+    /// </summary>
+    public bool? IsActive { get; init; }
     public GroupPurpose? Purpose { get; init; }
     public List<string>? Tags { get; init; }
 }
