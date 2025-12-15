@@ -620,9 +620,7 @@ public class TemplatesController : ControllerBase
             Subject: template.Subject,
             HtmlContent: template.HtmlContent,
             TextContent: template.TextContent,
-            Variables: template.Variables != null
-                ? JsonSerializer.Deserialize<Dictionary<string, string>>(template.Variables)
-                : null,
+            Variables: ParseVariables(template.Variables),
             TestData: template.TestData != null
                 ? JsonSerializer.Deserialize<Dictionary<string, object>>(template.TestData)
                 : null,
@@ -632,6 +630,45 @@ public class TemplatesController : ControllerBase
             CreatedAt: template.CreatedAt,
             UpdatedAt: template.UpdatedAt
         );
+    }
+
+    /// <summary>
+    /// Parses variables field which may be stored as either:
+    /// - JSON object: {"ClientName": "description", ...} → Dictionary&lt;string, string&gt;
+    /// - JSON array: ["ClientName", "ImportDate", ...] → Dictionary with empty descriptions
+    /// </summary>
+    private static Dictionary<string, string>? ParseVariables(string? variablesJson)
+    {
+        if (string.IsNullOrWhiteSpace(variablesJson))
+            return null;
+
+        using var doc = JsonDocument.Parse(variablesJson);
+        var root = doc.RootElement;
+
+        if (root.ValueKind == JsonValueKind.Object)
+        {
+            // Standard format: {"key": "description"}
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(variablesJson);
+        }
+
+        if (root.ValueKind == JsonValueKind.Array)
+        {
+            // Legacy format: ["key1", "key2"] - convert to dictionary with empty descriptions
+            var result = new Dictionary<string, string>();
+            foreach (var element in root.EnumerateArray())
+            {
+                if (element.ValueKind == JsonValueKind.String)
+                {
+                    var key = element.GetString();
+                    if (!string.IsNullOrEmpty(key))
+                        result[key] = string.Empty;
+                }
+            }
+            return result.Count > 0 ? result : null;
+        }
+
+        throw new InvalidOperationException(
+            $"Variables field has unexpected JSON format. Expected object or array, got {root.ValueKind}. Value: {variablesJson}");
     }
 }
 
