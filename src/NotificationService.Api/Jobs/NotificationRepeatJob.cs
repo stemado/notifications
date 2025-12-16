@@ -1,6 +1,6 @@
 using Quartz;
 using Microsoft.AspNetCore.SignalR;
-using NotificationService.Api.Hubs;
+using NotificationService.Infrastructure.Hubs;
 using NotificationService.Infrastructure.Services;
 
 namespace NotificationService.Api.Jobs;

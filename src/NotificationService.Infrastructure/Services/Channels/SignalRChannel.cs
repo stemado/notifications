@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using NotificationService.Domain.Enums;
 using NotificationService.Domain.Models;
+using NotificationService.Infrastructure.Hubs;
 using NotificationService.Infrastructure.Repositories;
 
 namespace NotificationService.Infrastructure.Services.Channels;
@@ -11,12 +12,12 @@ namespace NotificationService.Infrastructure.Services.Channels;
 /// </summary>
 public class SignalRChannel : INotificationChannel
 {
-    private readonly IHubContext<Hub> _hubContext;
+    private readonly IHubContext<NotificationHub> _hubContext;
     private readonly INotificationDeliveryRepository _deliveryRepository;
     private readonly ILogger<SignalRChannel> _logger;
 
     public SignalRChannel(
-        IHubContext<Hub> hubContext,
+        IHubContext<NotificationHub> hubContext,
         INotificationDeliveryRepository deliveryRepository,
         ILogger<SignalRChannel> logger)
     {

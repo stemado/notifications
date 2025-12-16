@@ -1,6 +1,6 @@
 using NotificationService.Api.Extensions;
-using NotificationService.Api.Hubs;
 using NotificationService.Api.Middleware;
+using NotificationService.Infrastructure.Hubs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting.WindowsServices;
