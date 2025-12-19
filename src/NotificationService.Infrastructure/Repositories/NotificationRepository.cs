@@ -33,7 +33,7 @@ public class NotificationRepository : INotificationRepository
     public async Task<List<Notification>> GetActiveForUserAsync(Guid userId)
     {
         return await _context.Notifications
-            .Where(n => n.UserId == userId && n.AcknowledgedAt == null)
+            .Where(n => n.UserId == userId && n.AcknowledgedAt == null && n.DismissedAt == null)
             .OrderByDescending(n => n.CreatedAt)
             .ToListAsync();
     }
@@ -49,7 +49,7 @@ public class NotificationRepository : INotificationRepository
     public async Task<Notification?> GetByGroupKeyAsync(string groupKey)
     {
         return await _context.Notifications
-            .Where(n => n.GroupKey == groupKey && n.AcknowledgedAt == null)
+            .Where(n => n.GroupKey == groupKey && n.AcknowledgedAt == null && n.DismissedAt == null)
             .OrderByDescending(n => n.CreatedAt)
             .FirstOrDefaultAsync();
     }
@@ -57,7 +57,7 @@ public class NotificationRepository : INotificationRepository
     public async Task<Notification?> GetActiveForSagaAsync(Guid sagaId)
     {
         return await _context.Notifications
-            .Where(n => n.SagaId == sagaId && n.AcknowledgedAt == null)
+            .Where(n => n.SagaId == sagaId && n.AcknowledgedAt == null && n.DismissedAt == null)
             .OrderByDescending(n => n.CreatedAt)
             .FirstOrDefaultAsync();
     }
@@ -69,6 +69,7 @@ public class NotificationRepository : INotificationRepository
         return await _context.Notifications
             .Where(n => n.RepeatInterval != null
                      && n.AcknowledgedAt == null
+                     && n.DismissedAt == null
                      && (n.LastRepeatedAt == null ||
                          n.LastRepeatedAt.Value.AddMinutes(n.RepeatInterval.Value) <= now))
             .ToListAsync();
