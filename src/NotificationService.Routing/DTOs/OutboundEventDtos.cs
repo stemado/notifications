@@ -81,3 +81,14 @@ public record DeliveryInfo
     public string? ErrorMessage { get; init; }
     public int AttemptCount { get; init; }
 }
+
+/// <summary>
+/// Response from publishing an outbound event
+/// </summary>
+public record PublishEventResponse
+{
+    public Guid EventId { get; init; }
+    public int DeliveryCount { get; init; }
+    public bool HasMatchingPolicies { get; init; }
+    public string? Message { get; init; }
+}

@@ -176,6 +176,142 @@ public class EventsController : ControllerBase
             FailedCount = e.Deliveries?.Count(d => d.Status == DeliveryStatus.Failed) ?? 0
         }).ToList());
     }
+
+    /// <summary>
+    /// Publish an outbound event for routing to recipients.
+    /// The routing engine evaluates policies and creates deliveries for matching recipients.
+    /// </summary>
+    [HttpPost]
+    public async Task<ActionResult<PublishEventResponse>> PublishEvent([FromBody] PublishEventApiRequest request)
+    {
+        // Parse service enum
+        if (!Enum.TryParse<NotificationService.Routing.Domain.Enums.SourceService>(request.Service, true, out var service))
+        {
+            return BadRequest($"Invalid service: {request.Service}. Valid values: {string.Join(", ", Enum.GetNames<NotificationService.Routing.Domain.Enums.SourceService>())}");
+        }
+
+        // Parse topic enum
+        if (!Enum.TryParse<NotificationService.Routing.Domain.Enums.NotificationTopic>(request.Topic, true, out var topic))
+        {
+            return BadRequest($"Invalid topic: {request.Topic}. Valid values: {string.Join(", ", Enum.GetNames<NotificationService.Routing.Domain.Enums.NotificationTopic>())}");
+        }
+
+        // Parse severity enum (default to Info)
+        var severity = NotificationSeverity.Info;
+        if (!string.IsNullOrEmpty(request.Severity) &&
+            !Enum.TryParse<NotificationSeverity>(request.Severity, true, out severity))
+        {
+            return BadRequest($"Invalid severity: {request.Severity}. Valid values: {string.Join(", ", Enum.GetNames<NotificationSeverity>())}");
+        }
+
+        _logger.LogInformation(
+            "Publishing outbound event: {Service}/{Topic} for client {ClientId}, saga {SagaId}",
+            service, topic, request.ClientId, request.SagaId);
+
+        // Create the outbound event
+        var outboundEvent = new NotificationService.Routing.Domain.Models.OutboundEvent
+        {
+            Service = service,
+            Topic = topic,
+            ClientId = request.ClientId,
+            Severity = severity,
+            TemplateId = request.TemplateId,
+            Subject = request.Subject,
+            Body = request.Body,
+            SagaId = request.SagaId,
+            CorrelationId = request.CorrelationId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Convert payload if provided
+        if (request.Payload != null)
+        {
+            foreach (var kvp in request.Payload)
+            {
+                outboundEvent.Payload[kvp.Key] = System.Text.Json.JsonSerializer.SerializeToElement(kvp.Value);
+            }
+        }
+
+        try
+        {
+            var eventId = await _router.PublishAsync(outboundEvent);
+
+            // Get the event to count deliveries
+            var createdEvent = await _router.GetEventAsync(eventId);
+            var deliveryCount = createdEvent?.Deliveries?.Count ?? 0;
+
+            return Ok(new PublishEventResponse
+            {
+                EventId = eventId,
+                DeliveryCount = deliveryCount,
+                HasMatchingPolicies = deliveryCount > 0,
+                Message = deliveryCount > 0
+                    ? $"Event published successfully. {deliveryCount} deliveries queued."
+                    : "Event published but no matching routing policies found. No deliveries created."
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to publish outbound event");
+            return StatusCode(500, new { error = "Failed to publish event", message = ex.Message });
+        }
+    }
+}
+
+/// <summary>
+/// API request for publishing an event (uses strings for enums for easier integration)
+/// </summary>
+public record PublishEventApiRequest
+{
+    /// <summary>
+    /// Source service (e.g., "CensusReconciliation", "CensusOrchestration")
+    /// </summary>
+    public required string Service { get; init; }
+
+    /// <summary>
+    /// Notification topic (e.g., "DailyImportSuccess", "ReconciliationEscalation")
+    /// </summary>
+    public required string Topic { get; init; }
+
+    /// <summary>
+    /// Client ID this event is associated with
+    /// </summary>
+    public string? ClientId { get; init; }
+
+    /// <summary>
+    /// Severity level (Info, Warning, Error, Critical). Defaults to Info.
+    /// </summary>
+    public string? Severity { get; init; }
+
+    /// <summary>
+    /// Optional template ID for rendering
+    /// </summary>
+    public string? TemplateId { get; init; }
+
+    /// <summary>
+    /// Subject line for the notification
+    /// </summary>
+    public string? Subject { get; init; }
+
+    /// <summary>
+    /// Body content (can be HTML for email)
+    /// </summary>
+    public string? Body { get; init; }
+
+    /// <summary>
+    /// Additional payload data for template rendering
+    /// </summary>
+    public Dictionary<string, object>? Payload { get; init; }
+
+    /// <summary>
+    /// Associated saga ID for correlation
+    /// </summary>
+    public Guid? SagaId { get; init; }
+
+    /// <summary>
+    /// Correlation ID for tracing
+    /// </summary>
+    public Guid? CorrelationId { get; init; }
 }
 
 /// <summary>
