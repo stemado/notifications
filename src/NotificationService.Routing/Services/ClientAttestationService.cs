@@ -18,12 +18,22 @@ public class ClientAttestationService : IClientAttestationService
     private readonly ILogger<ClientAttestationService> _logger;
 
     // Template types considered "attestation" templates
+    // All email template types that can be assigned to clients for attestation/notification purposes
     private static readonly HashSet<string> AttestationTemplateTypes = new(StringComparer.OrdinalIgnoreCase)
     {
+        // Original types
         "attestation",
         "notification",
         "success",
-        "summary"
+        "summary",
+        // Report and alert types
+        "report",
+        "alert",
+        // Workflow event types
+        "file_detected",
+        "validation_failed",
+        "archive_completed",
+        "workflow_triggered"
     };
 
     public ClientAttestationService(
