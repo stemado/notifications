@@ -24,6 +24,9 @@ public class RoutingDbContext : DbContext
     public DbSet<OutboundEvent> OutboundEvents => Set<OutboundEvent>();
     public DbSet<OutboundDelivery> OutboundDeliveries => Set<OutboundDelivery>();
     public DbSet<TestEmailDelivery> TestEmailDeliveries => Set<TestEmailDelivery>();
+    public DbSet<ClientAttestationTemplate> ClientAttestationTemplates => Set<ClientAttestationTemplate>();
+    public DbSet<ClientAttestationTemplatePolicy> ClientAttestationTemplatePolicies => Set<ClientAttestationTemplatePolicy>();
+    public DbSet<ClientAttestationTemplateGroup> ClientAttestationTemplateGroups => Set<ClientAttestationTemplateGroup>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -539,6 +542,174 @@ public class RoutingDbContext : DbContext
 
             entity.HasIndex(e => e.InitiatedBy)
                 .HasDatabaseName("idx_test_email_deliveries_initiated_by");
+        });
+
+        // Configure ClientAttestationTemplate entity
+        modelBuilder.Entity<ClientAttestationTemplate>(entity =>
+        {
+            entity.ToTable("client_attestation_templates");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("gen_random_uuid()")
+                .HasColumnName("id");
+
+            entity.Property(e => e.ClientId)
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnName("client_id");
+
+            entity.Property(e => e.TemplateId)
+                .IsRequired()
+                .HasColumnName("template_id");
+
+            entity.Property(e => e.IsEnabled)
+                .HasDefaultValue(true)
+                .HasColumnName("is_enabled");
+
+            entity.Property(e => e.Priority)
+                .HasDefaultValue(0)
+                .HasColumnName("priority");
+
+            entity.Property(e => e.Notes)
+                .HasColumnName("notes");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.UpdatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("updated_at");
+
+            entity.Property(e => e.UpdatedBy)
+                .HasMaxLength(200)
+                .HasColumnName("updated_by");
+
+            // Unique constraint: one configuration per client-template pair
+            entity.HasIndex(e => new { e.ClientId, e.TemplateId })
+                .IsUnique()
+                .HasDatabaseName("uq_client_template");
+
+            // Indexes for lookups
+            entity.HasIndex(e => e.ClientId)
+                .HasDatabaseName("idx_client_attestation_templates_client");
+
+            entity.HasIndex(e => e.TemplateId)
+                .HasDatabaseName("idx_client_attestation_templates_template");
+
+            entity.HasIndex(e => new { e.ClientId, e.IsEnabled })
+                .HasDatabaseName("idx_client_attestation_templates_enabled")
+                .HasFilter("is_enabled = true");
+        });
+
+        // Configure ClientAttestationTemplatePolicy entity
+        modelBuilder.Entity<ClientAttestationTemplatePolicy>(entity =>
+        {
+            entity.ToTable("client_attestation_template_policies");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("gen_random_uuid()")
+                .HasColumnName("id");
+
+            entity.Property(e => e.ClientAttestationTemplateId)
+                .IsRequired()
+                .HasColumnName("client_attestation_template_id");
+
+            entity.Property(e => e.RoutingPolicyId)
+                .IsRequired()
+                .HasColumnName("routing_policy_id");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.CreatedBy)
+                .HasMaxLength(200)
+                .HasColumnName("created_by");
+
+            // Relationships
+            entity.HasOne(e => e.ClientAttestationTemplate)
+                .WithMany(t => t.Policies)
+                .HasForeignKey(e => e.ClientAttestationTemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.RoutingPolicy)
+                .WithMany()
+                .HasForeignKey(e => e.RoutingPolicyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Unique constraint: one policy per client-template
+            entity.HasIndex(e => new { e.ClientAttestationTemplateId, e.RoutingPolicyId })
+                .IsUnique()
+                .HasDatabaseName("uq_attestation_template_policy");
+
+            entity.HasIndex(e => e.ClientAttestationTemplateId)
+                .HasDatabaseName("idx_cat_policies_template");
+
+            entity.HasIndex(e => e.RoutingPolicyId)
+                .HasDatabaseName("idx_cat_policies_policy");
+        });
+
+        // Configure ClientAttestationTemplateGroup entity
+        modelBuilder.Entity<ClientAttestationTemplateGroup>(entity =>
+        {
+            entity.ToTable("client_attestation_template_groups");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("gen_random_uuid()")
+                .HasColumnName("id");
+
+            entity.Property(e => e.ClientAttestationTemplateId)
+                .IsRequired()
+                .HasColumnName("client_attestation_template_id");
+
+            entity.Property(e => e.RecipientGroupId)
+                .IsRequired()
+                .HasColumnName("recipient_group_id");
+
+            entity.Property(e => e.Role)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(10)
+                .HasDefaultValueSql("'To'")
+                .HasColumnName("role");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.CreatedBy)
+                .HasMaxLength(200)
+                .HasColumnName("created_by");
+
+            // Relationships
+            entity.HasOne(e => e.ClientAttestationTemplate)
+                .WithMany(t => t.Groups)
+                .HasForeignKey(e => e.ClientAttestationTemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.RecipientGroup)
+                .WithMany()
+                .HasForeignKey(e => e.RecipientGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Unique constraint: one group per client-template
+            entity.HasIndex(e => new { e.ClientAttestationTemplateId, e.RecipientGroupId })
+                .IsUnique()
+                .HasDatabaseName("uq_attestation_template_group");
+
+            entity.HasIndex(e => e.ClientAttestationTemplateId)
+                .HasDatabaseName("idx_cat_groups_template");
+
+            entity.HasIndex(e => e.RecipientGroupId)
+                .HasDatabaseName("idx_cat_groups_group");
         });
 
         // Configure MassTransit outbox tables
