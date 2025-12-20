@@ -74,6 +74,9 @@ public static class RoutingServiceCollectionExtensions
         // Channel dispatcher for routing deliveries to Email/SMS/Teams
         services.AddScoped<IChannelDispatcher, ChannelDispatcher>();
 
+        // Aggregated email dispatcher for TO/CC/BCC support
+        services.AddScoped<IAggregatedEmailDispatcher, AggregatedEmailDispatcher>();
+
         // Message publisher for outbound deliveries
         services.AddScoped<IDeliveryMessagePublisher, DeliveryMessagePublisher>();
 
@@ -135,7 +138,19 @@ public static class RoutingServiceCollectionExtensions
 
         services.AddMassTransit(x =>
         {
-            // Register the consumer
+            // Register the aggregated batch consumer for email aggregation (TO/CC/BCC support)
+            x.AddConsumer<AggregatedEmailDeliveryConsumer>(cfg =>
+            {
+                cfg.Options<BatchOptions>(options =>
+                {
+                    // Wait for up to 100 messages or 2 seconds before processing
+                    options.MessageLimit = 100;
+                    options.TimeLimit = TimeSpan.FromSeconds(2);
+                    options.ConcurrencyLimit = 10;
+                });
+            });
+
+            // Keep single-message consumer for backwards compatibility (can be removed later)
             x.AddConsumer<DeliveryRequestedConsumer>();
 
             // Configure transport based on settings
@@ -174,7 +189,7 @@ public static class RoutingServiceCollectionExtensions
     {
         x.UsingInMemory((context, cfg) =>
         {
-            // Configure the delivery request queue
+            // Configure the delivery request queue with batch consumer for email aggregation
             cfg.ReceiveEndpoint("notification-delivery-requests", e =>
             {
                 // Configure retry policy
@@ -184,8 +199,8 @@ public static class RoutingServiceCollectionExtensions
                     maxInterval: TimeSpan.FromMinutes(5),
                     intervalDelta: TimeSpan.FromSeconds(10)));
 
-                // Configure the consumer
-                e.ConfigureConsumer<DeliveryRequestedConsumer>(context);
+                // Use the aggregated batch consumer for TO/CC/BCC email support
+                e.ConfigureConsumer<AggregatedEmailDeliveryConsumer>(context);
             });
 
             // Configure endpoints for all consumers
@@ -216,7 +231,7 @@ public static class RoutingServiceCollectionExtensions
                 h.Password(password);
             });
 
-            // Configure the delivery request queue
+            // Configure the delivery request queue with batch consumer for email aggregation
             cfg.ReceiveEndpoint("notification-delivery-requests", e =>
             {
                 // Configure retry policy
@@ -226,11 +241,11 @@ public static class RoutingServiceCollectionExtensions
                     maxInterval: TimeSpan.FromMinutes(5),
                     intervalDelta: TimeSpan.FromSeconds(10)));
 
-                // Configure the consumer
-                e.ConfigureConsumer<DeliveryRequestedConsumer>(context);
+                // Use the aggregated batch consumer for TO/CC/BCC email support
+                e.ConfigureConsumer<AggregatedEmailDeliveryConsumer>(context);
 
-                // Prefetch for better throughput
-                e.PrefetchCount = 16;
+                // Prefetch for better throughput with batch processing
+                e.PrefetchCount = 32;
             });
 
             // Configure endpoints for all consumers

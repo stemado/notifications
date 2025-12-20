@@ -105,6 +105,96 @@ public class GraphEmailService : IEmailService
         }
     }
 
+    public async Task<EmailSendResult> SendEmailAsync(
+        IEnumerable<string> toRecipients,
+        IEnumerable<string>? ccRecipients,
+        IEnumerable<string>? bccRecipients,
+        string subject,
+        string htmlBody,
+        CancellationToken ct = default)
+    {
+        var toList = toRecipients.ToList();
+        var ccList = ccRecipients?.ToList() ?? [];
+        var bccList = bccRecipients?.ToList() ?? [];
+
+        if (toList.Count == 0)
+        {
+            return EmailSendResult.Failed("At least one TO recipient is required", EmailProvider.MicrosoftGraph);
+        }
+
+        try
+        {
+            var fromAddress = !string.IsNullOrEmpty(_options.SendFromAddress)
+                ? _options.SendFromAddress
+                : "dexchange@antfarmservices.com";
+
+            var fromName = "Notification Service";
+
+            _logger.LogInformation(
+                "Sending email via Microsoft Graph API from {From}. TO: {ToCount}, CC: {CcCount}, BCC: {BccCount}. Subject: {Subject}",
+                fromAddress,
+                toList.Count,
+                ccList.Count,
+                bccList.Count,
+                subject);
+
+            var mimeMessage = new MimeMessage();
+            mimeMessage.From.Add(new MailboxAddress(fromName, fromAddress));
+
+            // Add TO recipients
+            foreach (var email in toList)
+            {
+                mimeMessage.To.Add(MailboxAddress.Parse(email));
+            }
+
+            // Add CC recipients
+            foreach (var email in ccList)
+            {
+                mimeMessage.Cc.Add(MailboxAddress.Parse(email));
+            }
+
+            // Add BCC recipients
+            foreach (var email in bccList)
+            {
+                mimeMessage.Bcc.Add(MailboxAddress.Parse(email));
+            }
+
+            mimeMessage.Subject = subject;
+            mimeMessage.Body = new BodyBuilder { HtmlBody = htmlBody }.ToMessageBody();
+
+            // Use the shared OutlookMailSender which handles all auth via file share config
+            var result = OutlookMailSender.Send(mimeMessage);
+
+            if (result.IsSuccess)
+            {
+                var messageId = Guid.NewGuid().ToString();
+                _logger.LogInformation(
+                    "Email sent successfully via Graph API. MessageId: {MessageId}, TO: {To}, CC: {Cc}, BCC: {Bcc}",
+                    messageId,
+                    string.Join(", ", toList),
+                    string.Join(", ", ccList),
+                    string.Join(", ", bccList));
+
+                return EmailSendResult.Successful(messageId, EmailProvider.MicrosoftGraph);
+            }
+
+            var errorMessage = $"Graph API send failed: {string.Join("; ", result.Errors.Select(e => e.Message))}";
+            _logger.LogError(
+                "Graph API email send failed. TO: {To}, CC: {Cc}, BCC: {Bcc}. Errors: {Errors}",
+                string.Join(", ", toList),
+                string.Join(", ", ccList),
+                string.Join(", ", bccList),
+                errorMessage);
+
+            return EmailSendResult.Failed(errorMessage, EmailProvider.MicrosoftGraph);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception sending email via Graph API. TO: {To}", string.Join(", ", toList));
+            return EmailSendResult.Failed($"Graph API exception: {ex.Message}", EmailProvider.MicrosoftGraph, ex);
+        }
+    }
+
     public Task<bool> ValidateConfigurationAsync(CancellationToken ct = default)
     {
         try

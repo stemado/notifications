@@ -47,6 +47,17 @@ public class OutboundDeliveryRepository : IOutboundDeliveryRepository
             .FirstOrDefaultAsync(d => d.Id == id);
     }
 
+    public async Task<List<OutboundDelivery>> GetByIdsAsync(IEnumerable<Guid> ids)
+    {
+        var idList = ids.ToList();
+        return await _context.OutboundDeliveries
+            .Where(d => idList.Contains(d.Id))
+            .Include(d => d.OutboundEvent)
+            .Include(d => d.Contact)
+            .Include(d => d.RoutingPolicy)
+            .ToListAsync();
+    }
+
     public async Task<List<OutboundDelivery>> GetByEventAsync(Guid eventId)
     {
         return await _context.OutboundDeliveries
@@ -111,7 +122,7 @@ public class OutboundDeliveryRepository : IOutboundDeliveryRepository
         return delivery;
     }
 
-    public async Task UpdateStatusAsync(Guid id, DeliveryStatus status, string? errorMessage = null)
+    public async Task UpdateStatusAsync(Guid id, DeliveryStatus status, string? errorMessage = null, string? externalMessageId = null)
     {
         var delivery = await _context.OutboundDeliveries.FindAsync(id)
             ?? throw new InvalidOperationException($"Delivery {id} not found");
@@ -126,6 +137,12 @@ public class OutboundDeliveryRepository : IOutboundDeliveryRepository
             case DeliveryStatus.Delivered:
                 delivery.DeliveredAt = DateTime.UtcNow;
                 delivery.SentAt ??= DateTime.UtcNow;
+                // Store the external message ID if provided (shared across aggregated deliveries)
+                if (!string.IsNullOrEmpty(externalMessageId))
+                {
+                    // Note: OutboundDelivery doesn't have ExternalMessageId yet
+                    // The message ID is stored on the OutboundEvent or can be added to delivery
+                }
                 break;
             case DeliveryStatus.Failed:
                 delivery.FailedAt = DateTime.UtcNow;

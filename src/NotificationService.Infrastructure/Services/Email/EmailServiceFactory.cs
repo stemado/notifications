@@ -103,6 +103,15 @@ public class FactoryBasedEmailService : IEmailService
     public Task<EmailSendResult> SendEmailAsync(IEnumerable<string> recipients, string subject, string htmlBody, bool isHtml = true, CancellationToken ct = default)
         => _innerService.SendEmailAsync(recipients, subject, htmlBody, isHtml, ct);
 
+    public Task<EmailSendResult> SendEmailAsync(
+        IEnumerable<string> toRecipients,
+        IEnumerable<string>? ccRecipients,
+        IEnumerable<string>? bccRecipients,
+        string subject,
+        string htmlBody,
+        CancellationToken ct = default)
+        => _innerService.SendEmailAsync(toRecipients, ccRecipients, bccRecipients, subject, htmlBody, ct);
+
     public Task<bool> ValidateConfigurationAsync(CancellationToken ct = default)
         => _innerService.ValidateConfigurationAsync(ct);
 }
