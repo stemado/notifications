@@ -35,6 +35,7 @@ public class SignalRChannel : INotificationChannel
             Id = Guid.NewGuid(),
             NotificationId = notification.Id,
             Channel = NotificationChannel.SignalR,
+            Status = DeliveryStatus.Processing,
             AttemptCount = 1
         };
 
@@ -60,6 +61,7 @@ public class SignalRChannel : INotificationChannel
                     .SendAsync("NewNotification", notification);
             }
 
+            delivery.Status = DeliveryStatus.Delivered;
             delivery.DeliveredAt = DateTime.UtcNow;
             _logger.LogInformation(
                 "SignalR notification {NotificationId} delivered to user {UserId}",
@@ -67,6 +69,7 @@ public class SignalRChannel : INotificationChannel
         }
         catch (Exception ex)
         {
+            delivery.Status = DeliveryStatus.Failed;
             delivery.FailedAt = DateTime.UtcNow;
             delivery.ErrorMessage = ex.Message;
             _logger.LogError(ex,

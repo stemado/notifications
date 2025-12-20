@@ -38,6 +38,19 @@ public interface IDeliveryTrackingService
     /// Cancel a pending delivery
     /// </summary>
     Task CancelDeliveryAsync(Guid deliveryId);
+
+    /// <summary>
+    /// Delete old delivered notification deliveries to prevent queue bloat.
+    /// Returns the number of records deleted.
+    /// </summary>
+    Task<int> DeleteOldDeliveredAsync(int daysOld = 30);
+
+    /// <summary>
+    /// Fix stale delivery records that have DeliveredAt set but Status is still Pending.
+    /// This corrects records created before the Status field was properly set.
+    /// Returns the number of records fixed.
+    /// </summary>
+    Task<int> FixStaleDeliveredRecordsAsync();
 }
 
 /// <summary>

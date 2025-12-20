@@ -190,6 +190,55 @@ public class DeliveryController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Fix stale delivery records that have DeliveredAt set but Status is still Pending.
+    /// This is a one-time fix for records created before the bug was fixed.
+    /// </summary>
+    [HttpPost("fix-stale")]
+    public async Task<ActionResult> FixStaleDeliveries()
+    {
+        try
+        {
+            var fixedCount = await _deliveryTracking.FixStaleDeliveredRecordsAsync();
+            return Ok(new
+            {
+                message = fixedCount > 0
+                    ? $"Fixed {fixedCount} stale delivery records"
+                    : "No stale records found to fix",
+                fixedCount
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fixing stale deliveries");
+            return StatusCode(500, new { error = "Failed to fix stale deliveries" });
+        }
+    }
+
+    /// <summary>
+    /// Delete old delivered records to clean up the database.
+    /// </summary>
+    [HttpPost("cleanup")]
+    public async Task<ActionResult> CleanupOldDeliveries([FromQuery] int daysOld = 30)
+    {
+        try
+        {
+            var deletedCount = await _deliveryTracking.DeleteOldDeliveredAsync(daysOld);
+            return Ok(new
+            {
+                message = deletedCount > 0
+                    ? $"Deleted {deletedCount} old delivered records older than {daysOld} days"
+                    : "No old records found to delete",
+                deletedCount
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error cleaning up old deliveries");
+            return StatusCode(500, new { error = "Failed to cleanup old deliveries" });
+        }
+    }
+
     private static string MapDeliveryStatus(DeliveryStatus status)
     {
         return status switch

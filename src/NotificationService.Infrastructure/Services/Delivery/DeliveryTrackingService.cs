@@ -147,4 +147,56 @@ public class DeliveryTrackingService : IDeliveryTrackingService
         await _context.SaveChangesAsync();
         _logger.LogInformation("Delivery {DeliveryId} cancelled", deliveryId);
     }
+
+    public async Task<int> DeleteOldDeliveredAsync(int daysOld = 30)
+    {
+        var cutoffDate = DateTime.UtcNow.AddDays(-daysOld);
+
+        var oldDeliveries = await _context.NotificationDeliveries
+            .Where(d => d.Status == DeliveryStatus.Delivered)
+            .Where(d => d.DeliveredAt != null && d.DeliveredAt < cutoffDate)
+            .ToListAsync();
+
+        if (oldDeliveries.Count == 0)
+        {
+            _logger.LogDebug("No old delivered records to clean up");
+            return 0;
+        }
+
+        _context.NotificationDeliveries.RemoveRange(oldDeliveries);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Deleted {Count} old delivered notification deliveries older than {DaysOld} days",
+            oldDeliveries.Count, daysOld);
+
+        return oldDeliveries.Count;
+    }
+
+    public async Task<int> FixStaleDeliveredRecordsAsync()
+    {
+        // Find records where delivery succeeded (DeliveredAt is set) but Status is still Pending
+        var staleRecords = await _context.NotificationDeliveries
+            .Where(d => d.Status == DeliveryStatus.Pending && d.DeliveredAt != null)
+            .ToListAsync();
+
+        if (staleRecords.Count == 0)
+        {
+            _logger.LogDebug("No stale delivered records to fix");
+            return 0;
+        }
+
+        foreach (var record in staleRecords)
+        {
+            record.Status = DeliveryStatus.Delivered;
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Fixed {Count} stale delivery records (had DeliveredAt but Status was Pending)",
+            staleRecords.Count);
+
+        return staleRecords.Count;
+    }
 }

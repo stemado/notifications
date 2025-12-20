@@ -40,6 +40,7 @@ public class EmailChannel : INotificationChannel
             Id = Guid.NewGuid(),
             NotificationId = notification.Id,
             Channel = NotificationChannel.Email,
+            Status = DeliveryStatus.Processing,
             AttemptCount = 1
         };
 
@@ -50,6 +51,7 @@ public class EmailChannel : INotificationChannel
             if (string.IsNullOrEmpty(userEmail))
             {
                 _logger.LogWarning("No email address found for user {UserId}", userId);
+                delivery.Status = DeliveryStatus.Failed;
                 delivery.FailedAt = DateTime.UtcNow;
                 delivery.ErrorMessage = "No email address found for user";
                 await _deliveryRepository.CreateAsync(delivery);
@@ -66,6 +68,7 @@ public class EmailChannel : INotificationChannel
 
             if (result.Success)
             {
+                delivery.Status = DeliveryStatus.Delivered;
                 delivery.DeliveredAt = DateTime.UtcNow;
                 _logger.LogInformation(
                     "Email notification {NotificationId} delivered to {UserEmail} via {Provider}",
@@ -73,6 +76,7 @@ public class EmailChannel : INotificationChannel
             }
             else
             {
+                delivery.Status = DeliveryStatus.Failed;
                 delivery.FailedAt = DateTime.UtcNow;
                 delivery.ErrorMessage = result.ErrorMessage ?? "Failed to send email";
                 _logger.LogWarning(
@@ -82,6 +86,7 @@ public class EmailChannel : INotificationChannel
         }
         catch (Exception ex)
         {
+            delivery.Status = DeliveryStatus.Failed;
             delivery.FailedAt = DateTime.UtcNow;
             delivery.ErrorMessage = ex.Message;
             _logger.LogError(ex,
