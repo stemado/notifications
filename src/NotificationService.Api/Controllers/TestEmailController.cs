@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using NotificationService.Domain.Enums;
 using NotificationService.Infrastructure.Repositories;
 using NotificationService.Infrastructure.Services.Email;
 using NotificationService.Infrastructure.Services.Templates;
@@ -27,6 +28,7 @@ public class TestEmailController : ControllerBase
     private readonly IEmailTemplateRepository _templateRepository;
     private readonly ITemplateRenderingService _renderingService;
     private readonly IEmailService _emailService;
+    private readonly IRoutingPolicyService _policyService;
     private readonly ILogger<TestEmailController> _logger;
 
     public TestEmailController(
@@ -36,6 +38,7 @@ public class TestEmailController : ControllerBase
         IEmailTemplateRepository templateRepository,
         ITemplateRenderingService renderingService,
         IEmailService emailService,
+        IRoutingPolicyService policyService,
         ILogger<TestEmailController> logger)
     {
         _groupService = groupService;
@@ -44,6 +47,7 @@ public class TestEmailController : ControllerBase
         _templateRepository = templateRepository;
         _renderingService = renderingService;
         _emailService = emailService;
+        _policyService = policyService;
         _logger = logger;
     }
 
@@ -320,6 +324,277 @@ public class TestEmailController : ControllerBase
         };
 
         return Ok(dto);
+    }
+
+    /// <summary>
+    /// Send a test email with explicit TO, CC, and BCC recipient groups.
+    /// Sends a single email with proper role-based addressing.
+    /// </summary>
+    [HttpPost("send-with-roles")]
+    [ProducesResponseType(typeof(TestEmailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SendWithRoles([FromBody] SendTestEmailWithRolesRequest request, CancellationToken ct)
+    {
+        // Validate TO group exists and is eligible
+        var toGroup = await _groupService.GetByIdAsync(request.ToGroupId);
+        if (toGroup == null)
+        {
+            return NotFound(new { message = $"TO recipient group {request.ToGroupId} not found" });
+        }
+        if (toGroup.Purpose == GroupPurpose.Production)
+        {
+            return BadRequest(new { message = $"TO group '{toGroup.Name}' is marked as Production-only and cannot receive test emails" });
+        }
+
+        // Get TO members
+        var toMembers = await _groupService.GetMembersAsync(request.ToGroupId);
+        var activeToMembers = toMembers.Where(m => m.IsActive).ToList();
+        if (!activeToMembers.Any())
+        {
+            return BadRequest(new { message = $"TO group '{toGroup.Name}' has no active members" });
+        }
+        var toEmails = activeToMembers.Select(m => m.Email).ToList();
+
+        // Validate CC group if provided
+        List<string>? ccEmails = null;
+        RecipientGroup? ccGroup = null;
+        if (request.CcGroupId.HasValue)
+        {
+            ccGroup = await _groupService.GetByIdAsync(request.CcGroupId.Value);
+            if (ccGroup == null)
+            {
+                return NotFound(new { message = $"CC recipient group {request.CcGroupId} not found" });
+            }
+            if (ccGroup.Purpose == GroupPurpose.Production)
+            {
+                return BadRequest(new { message = $"CC group '{ccGroup.Name}' is marked as Production-only and cannot receive test emails" });
+            }
+            var ccMembers = await _groupService.GetMembersAsync(request.CcGroupId.Value);
+            ccEmails = ccMembers.Where(m => m.IsActive).Select(m => m.Email).ToList();
+        }
+
+        // Validate BCC group if provided
+        List<string>? bccEmails = null;
+        RecipientGroup? bccGroup = null;
+        if (request.BccGroupId.HasValue)
+        {
+            bccGroup = await _groupService.GetByIdAsync(request.BccGroupId.Value);
+            if (bccGroup == null)
+            {
+                return NotFound(new { message = $"BCC recipient group {request.BccGroupId} not found" });
+            }
+            if (bccGroup.Purpose == GroupPurpose.Production)
+            {
+                return BadRequest(new { message = $"BCC group '{bccGroup.Name}' is marked as Production-only and cannot receive test emails" });
+            }
+            var bccMembers = await _groupService.GetMembersAsync(request.BccGroupId.Value);
+            bccEmails = bccMembers.Where(m => m.IsActive).Select(m => m.Email).ToList();
+        }
+
+        // Validate template exists
+        var template = await _templateRepository.GetByNameAsync(request.TemplateName, ct);
+        if (template == null)
+        {
+            return NotFound(new { message = $"Template '{request.TemplateName}' not found" });
+        }
+
+        // Parse template data
+        var data = string.IsNullOrEmpty(request.TemplateData)
+            ? new Dictionary<string, object>()
+            : JsonSerializer.Deserialize<Dictionary<string, object>>(request.TemplateData)
+              ?? new Dictionary<string, object>();
+
+        // Render template
+        var renderedSubject = _renderingService.RenderTemplate(template.Subject, data);
+        var renderedBody = _renderingService.RenderTemplate(template.HtmlContent ?? string.Empty, data);
+
+        // Get initiator
+        var initiatedBy = User.FindFirst(ClaimTypes.Name)?.Value
+            ?? User.FindFirst(ClaimTypes.Email)?.Value
+            ?? "api";
+
+        var totalRecipients = toEmails.Count + (ccEmails?.Count ?? 0) + (bccEmails?.Count ?? 0);
+
+        _logger.LogInformation(
+            "Sending role-based test email: Template={Template}, TO={ToCount}, CC={CcCount}, BCC={BccCount}, InitiatedBy={InitiatedBy}",
+            request.TemplateName,
+            toEmails.Count,
+            ccEmails?.Count ?? 0,
+            bccEmails?.Count ?? 0,
+            initiatedBy);
+
+        // Create delivery record with role information
+        var delivery = new TestEmailDelivery
+        {
+            ToGroupId = request.ToGroupId,
+            CcGroupId = request.CcGroupId,
+            BccGroupId = request.BccGroupId,
+            TemplateName = request.TemplateName,
+            Subject = renderedSubject,
+            Recipients = toEmails, // Legacy field - store TO for backward compat
+            ToRecipients = toEmails,
+            CcRecipients = ccEmails ?? new List<string>(),
+            BccRecipients = bccEmails ?? new List<string>(),
+            UsedRoleBasedSending = true,
+            TestReason = request.TestReason,
+            InitiatedBy = initiatedBy,
+            Metadata = data.ToDictionary(
+                kvp => kvp.Key,
+                kvp => JsonSerializer.SerializeToElement(kvp.Value))
+        };
+
+        try
+        {
+            // Send email using TO/CC/BCC overload
+            var result = await _emailService.SendEmailAsync(
+                toEmails,
+                ccEmails,
+                bccEmails,
+                renderedSubject,
+                renderedBody,
+                ct);
+
+            delivery.Success = result.Success;
+            delivery.MessageId = result.MessageId;
+            delivery.Provider = result.Provider.ToString();
+            delivery.ErrorMessage = result.ErrorMessage;
+
+            await _testEmailRepository.CreateAsync(delivery);
+
+            if (result.Success)
+            {
+                _logger.LogInformation(
+                    "Role-based test email sent: DeliveryId={DeliveryId}, MessageId={MessageId}, TO={ToCount}, CC={CcCount}, BCC={BccCount}",
+                    delivery.Id,
+                    result.MessageId,
+                    toEmails.Count,
+                    ccEmails?.Count ?? 0,
+                    bccEmails?.Count ?? 0);
+
+                return Ok(new TestEmailResponse
+                {
+                    Success = true,
+                    DeliveryId = delivery.Id,
+                    MessageId = result.MessageId,
+                    Message = $"Test email sent successfully to {totalRecipients} recipient(s) (TO: {toEmails.Count}, CC: {ccEmails?.Count ?? 0}, BCC: {bccEmails?.Count ?? 0})",
+                    SentAt = result.SentAt,
+                    Recipients = toEmails,
+                    RenderedSubject = renderedSubject
+                });
+            }
+
+            _logger.LogWarning(
+                "Role-based test email failed: DeliveryId={DeliveryId}, Error={Error}",
+                delivery.Id,
+                result.ErrorMessage);
+
+            return BadRequest(new TestEmailResponse
+            {
+                Success = false,
+                DeliveryId = delivery.Id,
+                ErrorMessage = result.ErrorMessage,
+                Message = $"Test email failed: {result.ErrorMessage}",
+                Recipients = toEmails,
+                RenderedSubject = renderedSubject
+            });
+        }
+        catch (Exception ex)
+        {
+            delivery.Success = false;
+            delivery.ErrorMessage = ex.Message;
+            await _testEmailRepository.CreateAsync(delivery);
+
+            _logger.LogError(ex,
+                "Role-based test email exception: DeliveryId={DeliveryId}, Template={Template}",
+                delivery.Id,
+                request.TemplateName);
+
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Preview which recipient groups would be used based on routing policies for a service/topic combination.
+    /// Useful for "Load from Policy" functionality in the test email modal.
+    /// </summary>
+    [HttpGet("preview-by-policy")]
+    [ProducesResponseType(typeof(PolicyMatchPreviewResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> PreviewByPolicy(
+        [FromQuery] SourceService service,
+        [FromQuery] NotificationTopic topic,
+        [FromQuery] string? clientId = null)
+    {
+        // Get all policies matching service/topic
+        var allPolicies = await _policyService.GetByServiceAndTopicAsync(service, topic);
+
+        // Filter by client if specified, otherwise include default (null clientId) policies
+        var matchedPolicies = clientId != null
+            ? allPolicies.Where(p => p.ClientId == clientId || p.ClientId == null).ToList()
+            : allPolicies.Where(p => p.ClientId == null).ToList();
+
+        // Group by role
+        var toGroups = new List<PolicyGroupMatch>();
+        var ccGroups = new List<PolicyGroupMatch>();
+        var bccGroups = new List<PolicyGroupMatch>();
+        var policySummaries = new List<MatchedPolicySummary>();
+
+        foreach (var policy in matchedPolicies.Where(p => p.IsEnabled))
+        {
+            var group = await _groupService.GetByIdAsync(policy.RecipientGroupId);
+            if (group == null) continue;
+
+            var members = await _groupService.GetMembersAsync(policy.RecipientGroupId);
+            var activeMemberCount = members.Count(m => m.IsActive);
+            var isTestEligible = group.Purpose != GroupPurpose.Production;
+
+            var groupMatch = new PolicyGroupMatch
+            {
+                GroupId = group.Id,
+                GroupName = group.Name,
+                ActiveMemberCount = activeMemberCount,
+                IsTestEligible = isTestEligible,
+                Role = policy.Role
+            };
+
+            // Add to appropriate role list (avoid duplicates)
+            var targetList = policy.Role switch
+            {
+                DeliveryRole.To => toGroups,
+                DeliveryRole.Cc => ccGroups,
+                DeliveryRole.Bcc => bccGroups,
+                _ => toGroups
+            };
+
+            if (!targetList.Any(g => g.GroupId == group.Id))
+            {
+                targetList.Add(groupMatch);
+            }
+
+            policySummaries.Add(new MatchedPolicySummary
+            {
+                PolicyId = policy.Id,
+                Service = service.ToString(),
+                Topic = topic.ToString(),
+                ClientId = policy.ClientId,
+                Role = policy.Role,
+                RecipientGroupId = policy.RecipientGroupId,
+                RecipientGroupName = group.Name,
+                IsTestEligible = isTestEligible,
+                Priority = policy.Priority
+            });
+        }
+
+        return Ok(new PolicyMatchPreviewResponse
+        {
+            ToGroups = toGroups,
+            CcGroups = ccGroups,
+            BccGroups = bccGroups,
+            MatchedPolicies = policySummaries.OrderByDescending(p => p.Priority).ToList(),
+            TotalToRecipients = toGroups.Sum(g => g.ActiveMemberCount),
+            TotalCcRecipients = ccGroups.Sum(g => g.ActiveMemberCount),
+            TotalBccRecipients = bccGroups.Sum(g => g.ActiveMemberCount)
+        });
     }
 
     private async Task<IActionResult> SendTestEmailInternal(

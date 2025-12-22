@@ -11,9 +11,26 @@ public class TestEmailDelivery
     public Guid Id { get; set; }
 
     /// <summary>
-    /// Optional reference to the recipient group used (null if ad-hoc contacts)
+    /// Optional reference to the recipient group used (null if ad-hoc contacts).
+    /// For legacy single-group sends, this is the group used.
+    /// For role-based sends, use ToGroupId/CcGroupId/BccGroupId instead.
     /// </summary>
     public Guid? RecipientGroupId { get; set; }
+
+    /// <summary>
+    /// Group ID for TO recipients (role-based sending)
+    /// </summary>
+    public Guid? ToGroupId { get; set; }
+
+    /// <summary>
+    /// Group ID for CC recipients (role-based sending)
+    /// </summary>
+    public Guid? CcGroupId { get; set; }
+
+    /// <summary>
+    /// Group ID for BCC recipients (role-based sending)
+    /// </summary>
+    public Guid? BccGroupId { get; set; }
 
     /// <summary>
     /// Name of the email template used
@@ -26,9 +43,29 @@ public class TestEmailDelivery
     public string Subject { get; set; } = string.Empty;
 
     /// <summary>
-    /// List of recipient email addresses
+    /// List of recipient email addresses (all recipients for legacy, TO only for role-based)
     /// </summary>
     public List<string> Recipients { get; set; } = new();
+
+    /// <summary>
+    /// List of TO recipient email addresses (role-based sending)
+    /// </summary>
+    public List<string> ToRecipients { get; set; } = new();
+
+    /// <summary>
+    /// List of CC recipient email addresses (role-based sending)
+    /// </summary>
+    public List<string> CcRecipients { get; set; } = new();
+
+    /// <summary>
+    /// List of BCC recipient email addresses (role-based sending)
+    /// </summary>
+    public List<string> BccRecipients { get; set; } = new();
+
+    /// <summary>
+    /// Whether this test email used role-based TO/CC/BCC sending
+    /// </summary>
+    public bool UsedRoleBasedSending { get; set; }
 
     /// <summary>
     /// Reason/notes for sending this test email (for audit trail)
@@ -72,4 +109,7 @@ public class TestEmailDelivery
 
     // Navigation
     public RecipientGroup? RecipientGroup { get; set; }
+    public RecipientGroup? ToGroup { get; set; }
+    public RecipientGroup? CcGroup { get; set; }
+    public RecipientGroup? BccGroup { get; set; }
 }

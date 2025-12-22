@@ -1,4 +1,5 @@
 using System.Text.Json;
+using NotificationService.Routing.Domain.Enums;
 
 namespace NotificationService.Routing.DTOs;
 
@@ -162,4 +163,103 @@ public record PaginatedResponse<T>
     public int TotalPages { get; init; }
     public bool HasNext { get; init; }
     public bool HasPrevious { get; init; }
+}
+
+/// <summary>
+/// Request to send a test email with explicit TO, CC, and BCC recipient groups.
+/// Enables testing of emails with proper role-based addressing.
+/// </summary>
+public record SendTestEmailWithRolesRequest
+{
+    /// <summary>
+    /// Name of the email template to use
+    /// </summary>
+    public required string TemplateName { get; init; }
+
+    /// <summary>
+    /// Group ID for TO recipients (required - at least one primary recipient needed)
+    /// </summary>
+    public required Guid ToGroupId { get; init; }
+
+    /// <summary>
+    /// Group ID for CC recipients (optional)
+    /// </summary>
+    public Guid? CcGroupId { get; init; }
+
+    /// <summary>
+    /// Group ID for BCC recipients (optional)
+    /// </summary>
+    public Guid? BccGroupId { get; init; }
+
+    /// <summary>
+    /// Template variable data as JSON string
+    /// </summary>
+    public string? TemplateData { get; init; }
+
+    /// <summary>
+    /// Reason for sending this test email (for audit purposes)
+    /// </summary>
+    public string? TestReason { get; init; }
+}
+
+/// <summary>
+/// Response showing which groups/recipients are matched by policy criteria
+/// </summary>
+public record PolicyMatchPreviewResponse
+{
+    public List<PolicyGroupMatch> ToGroups { get; init; } = new();
+    public List<PolicyGroupMatch> CcGroups { get; init; } = new();
+    public List<PolicyGroupMatch> BccGroups { get; init; } = new();
+    public List<MatchedPolicySummary> MatchedPolicies { get; init; } = new();
+    public int TotalToRecipients { get; init; }
+    public int TotalCcRecipients { get; init; }
+    public int TotalBccRecipients { get; init; }
+}
+
+/// <summary>
+/// Group matched by a policy with member count
+/// </summary>
+public record PolicyGroupMatch
+{
+    public Guid GroupId { get; init; }
+    public required string GroupName { get; init; }
+    public int ActiveMemberCount { get; init; }
+    public bool IsTestEligible { get; init; }
+    public DeliveryRole Role { get; init; }
+}
+
+/// <summary>
+/// Summary of a matched routing policy
+/// </summary>
+public record MatchedPolicySummary
+{
+    public Guid PolicyId { get; init; }
+    public required string Service { get; init; }
+    public required string Topic { get; init; }
+    public string? ClientId { get; init; }
+    public DeliveryRole Role { get; init; }
+    public Guid RecipientGroupId { get; init; }
+    public required string RecipientGroupName { get; init; }
+    public bool IsTestEligible { get; init; }
+    public int Priority { get; init; }
+}
+
+/// <summary>
+/// Extended test email delivery DTO with role information
+/// </summary>
+public record TestEmailDeliveryWithRolesDto : TestEmailDeliveryDto
+{
+    public Guid? ToGroupId { get; init; }
+    public string? ToGroupName { get; init; }
+    public List<string> ToRecipients { get; init; } = new();
+
+    public Guid? CcGroupId { get; init; }
+    public string? CcGroupName { get; init; }
+    public List<string> CcRecipients { get; init; } = new();
+
+    public Guid? BccGroupId { get; init; }
+    public string? BccGroupName { get; init; }
+    public List<string> BccRecipients { get; init; } = new();
+
+    public bool UsedRoleBasedSending { get; init; }
 }
