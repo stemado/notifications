@@ -526,10 +526,67 @@ public class RoutingDbContext : DbContext
                     v => JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(v, (JsonSerializerOptions?)null) ?? new Dictionary<string, JsonElement>()
                 );
 
+            // Role-based sending properties
+            entity.Property(e => e.ToGroupId)
+                .HasColumnName("to_group_id");
+
+            entity.Property(e => e.CcGroupId)
+                .HasColumnName("cc_group_id");
+
+            entity.Property(e => e.BccGroupId)
+                .HasColumnName("bcc_group_id");
+
+            entity.Property(e => e.ToRecipients)
+                .IsRequired()
+                .HasColumnName("to_recipients")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>()
+                );
+
+            entity.Property(e => e.CcRecipients)
+                .IsRequired()
+                .HasColumnName("cc_recipients")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>()
+                );
+
+            entity.Property(e => e.BccRecipients)
+                .IsRequired()
+                .HasColumnName("bcc_recipients")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>()
+                );
+
+            entity.Property(e => e.UsedRoleBasedSending)
+                .IsRequired()
+                .HasDefaultValue(false)
+                .HasColumnName("used_role_based_sending");
+
             // Relationships
             entity.HasOne(e => e.RecipientGroup)
                 .WithMany()
                 .HasForeignKey(e => e.RecipientGroupId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.ToGroup)
+                .WithMany()
+                .HasForeignKey(e => e.ToGroupId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.CcGroup)
+                .WithMany()
+                .HasForeignKey(e => e.CcGroupId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.BccGroup)
+                .WithMany()
+                .HasForeignKey(e => e.BccGroupId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             // Indexes
