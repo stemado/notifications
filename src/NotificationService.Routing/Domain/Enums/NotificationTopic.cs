@@ -97,5 +97,46 @@ public enum NotificationTopic
     /// <summary>
     /// Custom topic for ad-hoc notifications
     /// </summary>
-    Custom
+    Custom,
+
+    // Service Errors
+    /// <summary>
+    /// Import processor service error
+    /// </summary>
+    ImportProcessorError,
+
+    /// <summary>
+    /// Import history processor service error
+    /// </summary>
+    ImportHistoryProcessorError,
+
+    /// <summary>
+    /// Census orchestration service error
+    /// </summary>
+    OrchestrationServiceError,
+
+    /// <summary>
+    /// Service health has degraded
+    /// </summary>
+    ServiceHealthDegraded,
+
+    /// <summary>
+    /// Service has recovered from degraded state
+    /// </summary>
+    ServiceRecovered,
+
+    /// <summary>
+    /// Database connection error
+    /// </summary>
+    DatabaseConnectionError,
+
+    /// <summary>
+    /// External service timeout
+    /// </summary>
+    ExternalServiceTimeout,
+
+    /// <summary>
+    /// Unhandled exception in service
+    /// </summary>
+    UnhandledException
 }

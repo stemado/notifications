@@ -28,5 +28,15 @@ public enum SourceService
     /// <summary>
     /// PlanSource integration service
     /// </summary>
-    PlanSourceIntegration
+    PlanSourceIntegration,
+
+    /// <summary>
+    /// Import history processor service
+    /// </summary>
+    ImportHistoryProcessor,
+
+    /// <summary>
+    /// Import processor service (PlanSource imports)
+    /// </summary>
+    ImportProcessor
 }
