@@ -62,6 +62,7 @@ public static class RoutingServiceCollectionExtensions
         services.AddScoped<IOutboundDeliveryRepository, OutboundDeliveryRepository>();
         services.AddScoped<ITestEmailDeliveryRepository, TestEmailDeliveryRepository>();
         services.AddScoped<IClientAttestationRepository, ClientAttestationRepository>();
+        services.AddScoped<ITopicTemplateMappingRepository, TopicTemplateMappingRepository>();
 
         // Services
         services.AddScoped<IContactService, ContactService>();
@@ -70,6 +71,7 @@ public static class RoutingServiceCollectionExtensions
         services.AddScoped<IOutboundRouter, OutboundRouter>();
         services.AddScoped<IRoutingDashboardService, RoutingDashboardService>();
         services.AddScoped<IClientAttestationService, ClientAttestationService>();
+        services.AddScoped<ITemplateResolutionService, TemplateResolutionService>();
 
         // Channel dispatcher for routing deliveries to Email/SMS/Teams
         services.AddScoped<IChannelDispatcher, ChannelDispatcher>();

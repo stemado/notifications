@@ -27,6 +27,7 @@ public class RoutingDbContext : DbContext
     public DbSet<ClientAttestationTemplate> ClientAttestationTemplates => Set<ClientAttestationTemplate>();
     public DbSet<ClientAttestationTemplatePolicy> ClientAttestationTemplatePolicies => Set<ClientAttestationTemplatePolicy>();
     public DbSet<ClientAttestationTemplateGroup> ClientAttestationTemplateGroups => Set<ClientAttestationTemplateGroup>();
+    public DbSet<TopicTemplateMapping> TopicTemplateMappings => Set<TopicTemplateMapping>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -767,6 +768,68 @@ public class RoutingDbContext : DbContext
 
             entity.HasIndex(e => e.RecipientGroupId)
                 .HasDatabaseName("idx_cat_groups_group");
+        });
+
+        // Configure TopicTemplateMapping entity
+        modelBuilder.Entity<TopicTemplateMapping>(entity =>
+        {
+            entity.ToTable("topic_template_mappings");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("gen_random_uuid()")
+                .HasColumnName("id");
+
+            entity.Property(e => e.Service)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .HasColumnName("service");
+
+            entity.Property(e => e.Topic)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .HasColumnName("topic");
+
+            entity.Property(e => e.ClientId)
+                .HasMaxLength(100)
+                .HasColumnName("client_id");
+
+            entity.Property(e => e.TemplateId)
+                .IsRequired()
+                .HasColumnName("template_id");
+
+            entity.Property(e => e.IsEnabled)
+                .HasDefaultValue(true)
+                .HasColumnName("is_enabled");
+
+            entity.Property(e => e.Priority)
+                .HasDefaultValue(0)
+                .HasColumnName("priority");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.UpdatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("updated_at");
+
+            entity.Property(e => e.UpdatedBy)
+                .HasMaxLength(200)
+                .HasColumnName("updated_by");
+
+            // Indexes
+            entity.HasIndex(e => new { e.Service, e.Topic, e.IsEnabled })
+                .HasDatabaseName("idx_topic_template_mappings_lookup")
+                .HasFilter("is_enabled = true");
+
+            entity.HasIndex(e => new { e.Service, e.Topic, e.ClientId, e.IsEnabled })
+                .HasDatabaseName("idx_topic_template_mappings_client")
+                .HasFilter("is_enabled = true");
         });
 
         // Configure MassTransit outbox tables

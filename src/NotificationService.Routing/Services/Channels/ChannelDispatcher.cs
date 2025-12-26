@@ -10,23 +10,27 @@ namespace NotificationService.Routing.Services.Channels;
 /// <summary>
 /// Dispatches outbound deliveries to the appropriate channel.
 /// Routes based on the delivery's Channel property to Email, SMS, or Teams.
+/// Automatically resolves templates for email based on service/topic mappings.
 /// </summary>
 public class ChannelDispatcher : IChannelDispatcher
 {
     private readonly IEmailService _emailService;
     private readonly ISmsService _smsService;
     private readonly ITeamsService _teamsService;
+    private readonly ITemplateResolutionService _templateResolutionService;
     private readonly ILogger<ChannelDispatcher> _logger;
 
     public ChannelDispatcher(
         IEmailService emailService,
         ISmsService smsService,
         ITeamsService teamsService,
+        ITemplateResolutionService templateResolutionService,
         ILogger<ChannelDispatcher> logger)
     {
         _emailService = emailService;
         _smsService = smsService;
         _teamsService = teamsService;
+        _templateResolutionService = templateResolutionService;
         _logger = logger;
     }
 
@@ -60,27 +64,32 @@ public class ChannelDispatcher : IChannelDispatcher
                 isRetryable: false);
         }
 
-        var subject = evt.Subject ?? "Notification";
-        var body = evt.Body ?? "";
-
         _logger.LogDebug(
             "Dispatching email to {Email} for delivery {DeliveryId}",
             email, delivery.Id);
 
         try
         {
+            // Resolve template and render content
+            var resolvedContent = await _templateResolutionService.ResolveEmailContentAsync(
+                evt, cancellationToken);
+
+            _logger.LogDebug(
+                "Resolved email content for delivery {DeliveryId}: TemplateId={TemplateId}",
+                delivery.Id, resolvedContent.TemplateId);
+
             var result = await _emailService.SendEmailAsync(
                 email,
-                subject,
-                body,
-                plainTextBody: null,
+                resolvedContent.Subject,
+                resolvedContent.HtmlBody ?? "",
+                plainTextBody: resolvedContent.PlainTextBody,
                 ct: cancellationToken);
 
             if (result.Success)
             {
                 _logger.LogInformation(
-                    "Email sent successfully to {Email} for delivery {DeliveryId}",
-                    email, delivery.Id);
+                    "Email sent successfully to {Email} for delivery {DeliveryId} (TemplateId={TemplateId})",
+                    email, delivery.Id, resolvedContent.TemplateId);
                 return ChannelDispatchResult.Succeeded(result.MessageId);
             }
 
