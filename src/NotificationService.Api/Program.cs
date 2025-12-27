@@ -6,6 +6,9 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Serilog;
+using AntFarm.Logging.Extensions;
+using AntFarm.Logging.Middleware;
 
 // Enable Npgsql legacy timestamp behavior to handle DateTime with unspecified Kind
 // This must be called before any Npgsql connection is made
@@ -25,6 +28,15 @@ var builder = WebApplication.CreateBuilder(options);
 
 // Add Aspire ServiceDefaults for OpenTelemetry, health checks, and service discovery
 builder.AddServiceDefaults();
+
+// Configure Serilog using shared AntFarm.Logging library
+builder.Host.UseAntFarmSerilog();
+
+// Bootstrap logger for early startup messages
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
 // Configure URLs
 // Skip when running under Aspire (which manages URLs via ASPNETCORE_URLS)
@@ -95,6 +107,9 @@ var app = builder.Build();
 
 // CORS must be first to ensure headers are added even on errors
 app.UseCors("AllowAll");
+
+// Add correlation ID tracking for distributed tracing
+app.UseCorrelationId();
 
 // Add global exception handler to ensure CORS headers are preserved on errors
 app.UseExceptionHandler(errorApp =>
