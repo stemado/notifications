@@ -199,4 +199,70 @@ public class DeliveryTrackingService : IDeliveryTrackingService
 
         return staleRecords.Count;
     }
+
+    public async Task<NotificationDeliveriesResult> GetDeliveriesByNotificationAsync(Guid notificationId)
+    {
+        var allDeliveries = await _context.NotificationDeliveries
+            .Where(d => d.NotificationId == notificationId)
+            .OrderByDescending(d => d.CreatedAt)
+            .ToListAsync();
+
+        // Split into completed deliveries (history) and queued items
+        var completedStatuses = new[] { DeliveryStatus.Delivered, DeliveryStatus.Failed, DeliveryStatus.Bounced, DeliveryStatus.Cancelled };
+        var queuedStatuses = new[] { DeliveryStatus.Pending, DeliveryStatus.Processing };
+
+        return new NotificationDeliveriesResult
+        {
+            NotificationId = notificationId,
+            Deliveries = allDeliveries.Where(d => completedStatuses.Contains(d.Status)).ToList(),
+            QueuedItems = allDeliveries.Where(d => queuedStatuses.Contains(d.Status)).ToList()
+        };
+    }
+
+    public async Task RequeueNotificationAsync(Guid notificationId)
+    {
+        // Verify the notification exists
+        var notification = await _context.Notifications.FindAsync(notificationId);
+        if (notification == null)
+        {
+            _logger.LogWarning("Notification {NotificationId} not found for requeue", notificationId);
+            throw new InvalidOperationException($"Notification {notificationId} not found");
+        }
+
+        // Get existing failed deliveries for this notification to determine which channels to retry
+        var failedDeliveries = await _context.NotificationDeliveries
+            .Where(d => d.NotificationId == notificationId)
+            .Where(d => d.Status == DeliveryStatus.Failed || d.Status == DeliveryStatus.Bounced)
+            .ToListAsync();
+
+        if (!failedDeliveries.Any())
+        {
+            _logger.LogWarning("No failed deliveries found for notification {NotificationId}", notificationId);
+            throw new InvalidOperationException($"No failed deliveries to requeue for notification {notificationId}");
+        }
+
+        // Create new pending delivery records for each failed channel
+        foreach (var failed in failedDeliveries)
+        {
+            var newDelivery = new NotificationDelivery
+            {
+                Id = Guid.NewGuid(),
+                NotificationId = notificationId,
+                Channel = failed.Channel,
+                Status = DeliveryStatus.Pending,
+                AttemptCount = 0,
+                MaxAttempts = failed.MaxAttempts,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.NotificationDeliveries.Add(newDelivery);
+            _logger.LogInformation(
+                "Created new delivery {DeliveryId} for notification {NotificationId} on channel {Channel}",
+                newDelivery.Id, notificationId, failed.Channel);
+        }
+
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Requeued {Count} channels for notification {NotificationId}",
+            failedDeliveries.Count, notificationId);
+    }
 }

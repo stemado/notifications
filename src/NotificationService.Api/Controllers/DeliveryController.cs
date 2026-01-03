@@ -239,6 +239,79 @@ public class DeliveryController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Get all delivery records and queue items for a specific notification.
+    /// Used for the delivery timeline view in the modal.
+    /// </summary>
+    [HttpGet("by-notification/{notificationId}")]
+    public async Task<ActionResult> GetByNotification(Guid notificationId)
+    {
+        try
+        {
+            var result = await _deliveryTracking.GetDeliveriesByNotificationAsync(notificationId);
+
+            var response = new
+            {
+                notificationId = result.NotificationId,
+                deliveries = result.Deliveries.Select(d => new
+                {
+                    id = d.Id,
+                    notificationId = d.NotificationId,
+                    channel = d.Channel.ToString(),
+                    status = MapDeliveryRecordStatus(d.Status, d.DeliveredAt, d.FailedAt),
+                    deliveredAt = d.DeliveredAt?.ToString("o"),
+                    failedAt = d.FailedAt?.ToString("o"),
+                    errorMessage = d.ErrorMessage,
+                    responseData = d.ResponseData != null
+                        ? System.Text.Json.JsonSerializer.Deserialize<object>(d.ResponseData)
+                        : null
+                }),
+                queuedItems = result.QueuedItems.Select(d => new
+                {
+                    id = d.Id,
+                    notificationId = d.NotificationId,
+                    channel = d.Channel.ToString(),
+                    status = MapDeliveryStatus(d.Status),
+                    attempts = d.AttemptCount,
+                    maxAttempts = d.MaxAttempts,
+                    nextRetryAt = d.NextRetryAt?.ToString("o"),
+                    lastError = d.ErrorMessage,
+                    createdAt = d.CreatedAt.ToString("o")
+                })
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving deliveries for notification {NotificationId}", notificationId);
+            return StatusCode(500, new { error = "Failed to retrieve deliveries for notification" });
+        }
+    }
+
+    /// <summary>
+    /// Re-queue a notification for delivery.
+    /// Creates new delivery records for failed channels.
+    /// </summary>
+    [HttpPost("requeue/{notificationId}")]
+    public async Task<ActionResult> RequeueNotification(Guid notificationId)
+    {
+        try
+        {
+            await _deliveryTracking.RequeueNotificationAsync(notificationId);
+            return Ok(new { message = "Notification queued for re-delivery" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error requeueing notification {NotificationId}", notificationId);
+            return StatusCode(500, new { error = "Failed to requeue notification" });
+        }
+    }
+
     private static string MapDeliveryStatus(DeliveryStatus status)
     {
         return status switch

@@ -51,6 +51,28 @@ public interface IDeliveryTrackingService
     /// Returns the number of records fixed.
     /// </summary>
     Task<int> FixStaleDeliveredRecordsAsync();
+
+    /// <summary>
+    /// Get all deliveries (queue and history) for a specific notification.
+    /// Used for the delivery timeline view.
+    /// </summary>
+    Task<NotificationDeliveriesResult> GetDeliveriesByNotificationAsync(Guid notificationId);
+
+    /// <summary>
+    /// Re-queue a notification for delivery.
+    /// Creates new delivery records for all configured channels.
+    /// </summary>
+    Task RequeueNotificationAsync(Guid notificationId);
+}
+
+/// <summary>
+/// Result containing all deliveries for a notification
+/// </summary>
+public class NotificationDeliveriesResult
+{
+    public Guid NotificationId { get; set; }
+    public List<NotificationDelivery> Deliveries { get; set; } = new();
+    public List<NotificationDelivery> QueuedItems { get; set; } = new();
 }
 
 /// <summary>
