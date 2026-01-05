@@ -138,5 +138,16 @@ public enum NotificationTopic
     /// <summary>
     /// Unhandled exception in service
     /// </summary>
-    UnhandledException
+    UnhandledException,
+
+    // OTS (OneTimeSpreadsheets)
+    /// <summary>
+    /// OTS scheduled run completed successfully
+    /// </summary>
+    OTSScheduledRunSuccess,
+
+    /// <summary>
+    /// OTS scheduled run failed
+    /// </summary>
+    OTSScheduledRunFailure
 }

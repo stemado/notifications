@@ -38,5 +38,10 @@ public enum SourceService
     /// <summary>
     /// Import processor service (PlanSource imports)
     /// </summary>
-    ImportProcessor
+    ImportProcessor,
+
+    /// <summary>
+    /// OneTimeSpreadsheets service for OTS payroll processing
+    /// </summary>
+    OneTimeSpreadsheetService
 }
