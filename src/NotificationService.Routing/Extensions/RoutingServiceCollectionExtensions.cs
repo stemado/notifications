@@ -72,6 +72,8 @@ public static class RoutingServiceCollectionExtensions
         services.AddScoped<IRoutingDashboardService, RoutingDashboardService>();
         services.AddScoped<IClientAttestationService, ClientAttestationService>();
         services.AddScoped<ITemplateResolutionService, TemplateResolutionService>();
+        services.AddScoped<ITopicService, TopicService>();
+        services.AddScoped<IFlowVisualizationService, FlowVisualizationService>();
 
         // Channel dispatcher for routing deliveries to Email/SMS/Teams
         services.AddScoped<IChannelDispatcher, ChannelDispatcher>();

@@ -28,6 +28,7 @@ public class RoutingDbContext : DbContext
     public DbSet<ClientAttestationTemplatePolicy> ClientAttestationTemplatePolicies => Set<ClientAttestationTemplatePolicy>();
     public DbSet<ClientAttestationTemplateGroup> ClientAttestationTemplateGroups => Set<ClientAttestationTemplateGroup>();
     public DbSet<TopicTemplateMapping> TopicTemplateMappings => Set<TopicTemplateMapping>();
+    public DbSet<Topic> Topics => Set<Topic>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -830,6 +831,80 @@ public class RoutingDbContext : DbContext
             entity.HasIndex(e => new { e.Service, e.Topic, e.ClientId, e.IsEnabled })
                 .HasDatabaseName("idx_topic_template_mappings_client")
                 .HasFilter("is_enabled = true");
+        });
+
+        // Configure Topic entity (Topic Registry)
+        modelBuilder.Entity<Topic>(entity =>
+        {
+            entity.ToTable("topics");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("gen_random_uuid()")
+                .HasColumnName("id");
+
+            entity.Property(e => e.Service)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .HasColumnName("service");
+
+            entity.Property(e => e.TopicName)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .HasColumnName("topic");
+
+            entity.Property(e => e.DisplayName)
+                .IsRequired()
+                .HasMaxLength(100)
+                .HasColumnName("display_name");
+
+            entity.Property(e => e.Description)
+                .HasColumnName("description");
+
+            entity.Property(e => e.TriggerDescription)
+                .HasColumnName("trigger_description");
+
+            entity.Property(e => e.PayloadSchema)
+                .HasColumnName("payload_schema")
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(v, (JsonSerializerOptions?)null)
+                );
+
+            entity.Property(e => e.DocsUrl)
+                .HasMaxLength(500)
+                .HasColumnName("docs_url");
+
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.UpdatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("NOW()")
+                .HasColumnName("updated_at");
+
+            entity.Property(e => e.UpdatedBy)
+                .HasMaxLength(200)
+                .HasColumnName("updated_by");
+
+            // Unique constraint: one entry per service/topic combination
+            entity.HasIndex(e => new { e.Service, e.TopicName })
+                .IsUnique()
+                .HasDatabaseName("uq_topics_service_topic");
+
+            // Index for active topics lookup
+            entity.HasIndex(e => new { e.Service, e.IsActive })
+                .HasDatabaseName("idx_topics_service_active")
+                .HasFilter("is_active = true");
         });
 
         // Configure MassTransit outbox tables
