@@ -540,6 +540,138 @@ public class NotificationServiceClient : INotificationServiceClient
         };
     }
 
+    public async Task<NotificationResponse> PublishServiceStatusEventAsync(
+        ServiceStatusEvent evt,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
+        var severity = DetermineServiceStatusSeverity(evt);
+        var (title, message) = BuildServiceStatusContent(evt);
+
+        _logger.LogInformation(
+            "Publishing ServiceStatusEvent: ServiceId={ServiceId}, EventType={EventType}, Status={Status}, Severity={Severity}",
+            evt.ServiceId, evt.EventType, evt.CurrentStatus, severity);
+
+        var request = new CreateNotificationRequest
+        {
+            UserId = SystemUserId,
+            TenantId = null,
+            Severity = severity,
+            Title = title,
+            Message = message,
+            EventId = evt.Id,
+            EventType = nameof(ServiceStatusEvent),
+            GroupKey = BuildServiceStatusGroupKey(evt),
+            RequiresAck = severity >= NotificationSeverity.Urgent,
+            ExpiresAt = evt.EventType == ServiceStatusEventType.ServiceRecovered
+                ? DateTime.UtcNow.AddHours(4)
+                : null,
+            Metadata = new Dictionary<string, object>
+            {
+                ["serviceId"] = evt.ServiceId,
+                ["serviceName"] = evt.ServiceName,
+                ["category"] = evt.Category,
+                ["eventType"] = evt.EventType.ToString(),
+                ["previousStatus"] = evt.PreviousStatus,
+                ["currentStatus"] = evt.CurrentStatus,
+                ["errorMessage"] = evt.ErrorMessage ?? string.Empty,
+                ["responseTimeMs"] = evt.ResponseTimeMs ?? 0,
+                ["thresholdMs"] = evt.ThresholdMs ?? 0,
+                ["incidentId"] = evt.IncidentId?.ToString() ?? string.Empty,
+                ["incidentDurationSeconds"] = evt.IncidentDuration?.TotalSeconds ?? 0,
+                ["failedCheckCount"] = evt.FailedCheckCount ?? 0,
+                ["affectedDependents"] = string.Join(", ", evt.AffectedDependents),
+                ["healthCheckUrl"] = evt.HealthCheckUrl ?? string.Empty,
+                ["correlationId"] = evt.CorrelationId ?? string.Empty
+            },
+            Actions = BuildServiceStatusActions(evt)
+        };
+
+        return evt.EventType switch
+        {
+            ServiceStatusEventType.ServiceRecovered or ServiceStatusEventType.IncidentResolved
+                => await CreateNotificationAsync(request, cancellationToken),
+            _ => await CreateOrUpdateNotificationAsync(request, cancellationToken)
+        };
+    }
+
+    private static NotificationSeverity DetermineServiceStatusSeverity(ServiceStatusEvent evt)
+    {
+        return evt.EventType switch
+        {
+            ServiceStatusEventType.ServiceDown => NotificationSeverity.Critical,
+            ServiceStatusEventType.IncidentCreated => NotificationSeverity.Urgent,
+            ServiceStatusEventType.ServiceDegraded => NotificationSeverity.Warning,
+            ServiceStatusEventType.ServiceRecovered => NotificationSeverity.Info,
+            ServiceStatusEventType.IncidentResolved => NotificationSeverity.Info,
+            _ => NotificationSeverity.Info
+        };
+    }
+
+    private static (string title, string message) BuildServiceStatusContent(ServiceStatusEvent evt)
+    {
+        return evt.EventType switch
+        {
+            ServiceStatusEventType.ServiceDown => (
+                $"Service Down: {evt.ServiceName}",
+                $"Service '{evt.ServiceName}' ({evt.Category}) is not responding. " +
+                (evt.ErrorMessage != null ? $"Error: {evt.ErrorMessage}" : "Health check failed.")
+            ),
+            ServiceStatusEventType.ServiceDegraded => (
+                $"Service Degraded: {evt.ServiceName}",
+                $"Service '{evt.ServiceName}' is experiencing high latency. " +
+                $"Response time: {evt.ResponseTimeMs}ms (threshold: {evt.ThresholdMs}ms)"
+            ),
+            ServiceStatusEventType.ServiceRecovered => (
+                $"Service Recovered: {evt.ServiceName}",
+                $"Service '{evt.ServiceName}' is now healthy. Previous status: {evt.PreviousStatus}"
+            ),
+            ServiceStatusEventType.IncidentCreated => (
+                $"Incident Created: {evt.ServiceName}",
+                $"New incident detected for service '{evt.ServiceName}'. " +
+                (evt.ErrorMessage != null ? $"Error: {evt.ErrorMessage}" : "Service is experiencing issues.")
+            ),
+            ServiceStatusEventType.IncidentResolved => (
+                $"Incident Resolved: {evt.ServiceName}",
+                $"Incident for service '{evt.ServiceName}' has been resolved. " +
+                $"Duration: {FormatDuration(evt.IncidentDuration ?? TimeSpan.Zero)}. " +
+                $"Failed checks: {evt.FailedCheckCount ?? 0}"
+            ),
+            _ => ($"Service Status: {evt.ServiceName}", $"Status changed to {evt.CurrentStatus}")
+        };
+    }
+
+    private static string BuildServiceStatusGroupKey(ServiceStatusEvent evt)
+    {
+        return evt.EventType switch
+        {
+            ServiceStatusEventType.IncidentCreated or ServiceStatusEventType.IncidentResolved
+                => $"service:incident:{evt.IncidentId}",
+            _ => $"service:status:{evt.ServiceId}:{evt.EventType}"
+        };
+    }
+
+    private static List<NotificationAction> BuildServiceStatusActions(ServiceStatusEvent evt)
+    {
+        var actions = new List<NotificationAction>
+        {
+            new() { Label = "View Dashboard", Url = "/orchestration/service-status", ActionType = "link" }
+        };
+
+        if (evt.EventType is ServiceStatusEventType.ServiceDown or ServiceStatusEventType.ServiceDegraded)
+        {
+            actions.Add(new()
+            {
+                Label = "Trigger Health Check",
+                Url = $"/api/service-status/{evt.ServiceId}/check",
+                ActionType = "action"
+            });
+        }
+
+        return actions;
+    }
+
     private static string BuildFilePickedUpMessage(FilePickedUpEvent evt)
     {
         var message = $"File '{evt.FileName}' detected and registered for processing.";

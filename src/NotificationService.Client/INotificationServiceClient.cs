@@ -173,6 +173,17 @@ public interface INotificationServiceClient
         TemplatesQueuedEvent evt,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Publishes a ServiceStatusEvent for service health status changes and incidents.
+    /// </summary>
+    /// <param name="evt">The event details including service ID, status change, and incident info</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Response with notification ID</returns>
+    /// <exception cref="NotificationServiceException">Thrown when the request fails</exception>
+    Task<NotificationResponse> PublishServiceStatusEventAsync(
+        ServiceStatusEvent evt,
+        CancellationToken cancellationToken = default);
+
     #endregion
 
     #region Health Check
